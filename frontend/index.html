@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>myT MOBILES - Spin & Win Contest</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Meta tags -->
+    <meta name="description" content="myT MOBILES Spin & Win Contest - Win amazing prizes including Smart TV, Refrigerator, and more!">
+    <meta name="keywords" content="myT MOBILES, contest, spin wheel, prizes, mobile accessories">
+    <meta name="author" content="myT MOBILES">
+    
+    <!-- PWA Meta -->
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="myt-mobiles-logo.png">
+    
+    <!-- Styles with cache busting -->
+    <link rel="stylesheet" href="style.css?v=11.4_20250922">
+</head>
+<body>
+    <!-- Background Elements -->
+    <div class="background-elements">
+        <div class="floating-element">🎁</div>
+        <div class="floating-element">🏆</div>
+        <div class="floating-element">⭐</div>
+        <div class="floating-element">🎉</div>
+        <div class="floating-element">💎</div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <!-- Top Navigation -->
+            <div class="top-nav">
+                <div class="brand-logo">
+                    <img src="myt-mobiles-logo.png" alt="myT MOBILES" class="logo-img">
+                </div>
+                <div class="title-section">
+                    <h1 class="main-title">SPIN & WIN CONTEST</h1>
+                    <p class="subtitle">Win Amazing Prizes Every Day!</p>
+                </div>
+                <div class="control-buttons">
+                    <button class="control-btn" id="soundToggle" title="Toggle Sound">
+                        <span class="control-icon">🔊</span>
+                    </button>
+                    <button class="control-btn" id="effectsToggle" title="Toggle Effects">
+                        <span class="control-icon">✨</span>
+                    </button>
+                    <button class="control-btn" id="adminBtn" onclick="openAdminPanel()" title="Admin Panel" style="display: none;">
+                        <span class="control-icon">⚙️</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lucky Draw Promotion -->
+        <div class="lucky-draw-section">
+            <div class="lucky-draw-box">
+                <div class="lucky-draw-animation-container">
+                    <div id="animated-scooty" class="lucky-draw-icon">🛵</div>
+                </div>
+                <div class="lucky-draw-content">
+                    <h3 class="lucky-draw-title">Lucky Draw: Get a chance to win a Yamaha Fascino</h3>
+                    <p class="lucky-draw-terms">*Terms and conditions apply</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Wheel Section -->
+            <div class="wheel-container">
+                <div class="wheel-pointer" id="wheelPointer"></div>
+                <div class="wheel-sparks" id="wheelSparks">
+                    <div class="spark"></div>
+                    <div class="spark"></div>
+                    <div class="spark"></div>
+                    <div class="spark"></div>
+                    <div class="spark"></div>
+                </div>
+                <div class="wheel" id="wheel">
+                    <div class="wheel-inner" id="wheelInner">
+                        <!-- Segments will be generated dynamically -->
+                    </div>
+                    <button class="wheel-center-button" id="spinButton">SPIN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Spinning the wheel...</p>
+        </div>
+    </div>
+
+    <!-- Prize Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="prizeModal">
+            <div class="prize-emoji" id="prizeEmoji">🎁</div>
+            <h2 class="prize-name" id="prizeName">Prize Name</h2>
+            <div class="prize-category" id="prizeCategory">Category</div>
+            <div class="prize-display" id="prizeDisplay">
+                <!-- Prize details will be shown here -->
+            </div>
+            <button class="close-button" id="closeModal">Claim Prize</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Initialize scooty animation
+        document.addEventListener('DOMContentLoaded', function() {
+            animateScooty();
+        });
+        
+        function animateScooty() {
+            // Create a custom scooty element with an image instead of emoji
+            // This ensures consistent rendering across platforms
+            const container = document.querySelector('.lucky-draw-animation-container');
+            const scooty = document.getElementById('animated-scooty');
+            
+            // Clear the container
+            scooty.innerHTML = '';
+            
+            // Create a span with the scooty emoji
+            const scootyEmoji = document.createElement('span');
+            scootyEmoji.textContent = '🛵';
+            scootyEmoji.style.fontSize = '2.5rem';
+            scootyEmoji.style.display = 'inline-block';
+            scooty.appendChild(scootyEmoji);
+            
+            let isMovingRight = true;
+            
+            function startAnimation() {
+                // Reset styles
+                scooty.style.animation = '';
+                scootyEmoji.style.transform = '';
+                
+                // Force a reflow
+                void scooty.offsetWidth;
+                
+                if (isMovingRight) {
+                    // Moving right - scooty should face right
+                    scooty.style.animation = 'moveLeftToRight 6s ease-in-out';
+                    scootyEmoji.style.transform = 'scaleX(1)';
+                } else {
+                    // Moving left - scooty should face left
+                    scooty.style.animation = 'moveRightToLeft 6s ease-in-out';
+                    scootyEmoji.style.transform = 'scaleX(-1)';
+                }
+            }
+            
+            function handleAnimationEnd() {
+                isMovingRight = !isMovingRight;
+                startAnimation();
+            }
+            
+            // Remove any existing event listeners to prevent duplicates
+            const newScooty = scooty.cloneNode(true);
+            container.replaceChild(newScooty, scooty);
+            
+            // Add event listener to the new element
+            newScooty.addEventListener('animationend', handleAnimationEnd);
+            
+            // Start the animation
+            startAnimation();
+        }
+        
+        // Admin authentication state
+        let isAdminAuthenticated = false;
+        let adminSessionTimeout = null;
+
+        // Admin Panel Access Function
+        function openAdminPanel() {
+            // Create admin panel popup with links to admin interfaces
+            const adminLinks = [
+                { name: 'Admin Panel', url: 'admin.html' },
+                { name: 'Database Manager', url: 'db-manager.html' }
+            ];
+            
+            // Create a simple popup
+            const popup = document.createElement('div');
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.background = 'rgba(0, 0, 0, 0.9)';
+            popup.style.padding = '2rem';
+            popup.style.borderRadius = '15px';
+            popup.style.boxShadow = '0 0 20px rgba(0, 212, 255, 0.5)';
+            popup.style.zIndex = '1000';
+            popup.style.minWidth = '300px';
+            popup.style.textAlign = 'center';
+            
+            // Add title
+            const title = document.createElement('h3');
+            title.textContent = 'Admin Access';
+            title.style.color = '#00d4ff';
+            title.style.marginBottom = '1.5rem';
+            popup.appendChild(title);
+            
+            // Add links
+            adminLinks.forEach(link => {
+                const button = document.createElement('button');
+                button.textContent = link.name;
+                button.style.background = 'linear-gradient(135deg, #00d4ff, #0099cc)';
+                button.style.color = 'white';
+                button.style.border = 'none';
+                button.style.padding = '0.8rem 2rem';
+                button.style.borderRadius = '8px';
+                button.style.fontSize = '1rem';
+                button.style.fontWeight = '600';
+                button.style.cursor = 'pointer';
+                button.style.margin = '0.5rem';
+                button.style.width = '100%';
+                button.onclick = () => window.location.href = link.url;
+                popup.appendChild(button);
+            });
+            
+            // Add close button
+            const closeButton = document.createElement('button');
+            closeButton.textContent = 'Close';
+            closeButton.style.background = 'linear-gradient(135deg, #ff6b6b, #ee5a24)';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.padding = '0.8rem 2rem';
+            closeButton.style.borderRadius = '8px';
+            closeButton.style.fontSize = '1rem';
+            closeButton.style.fontWeight = '600';
+            closeButton.style.cursor = 'pointer';
+            closeButton.style.margin = '1rem 0.5rem 0.5rem';
+            closeButton.style.width = '100%';
+            closeButton.onclick = () => document.body.removeChild(popup);
+            popup.appendChild(closeButton);
+            
+            document.body.appendChild(popup);
+        }
+
+        // Admin Authentication Function
+        function authenticateAdmin() {
+            const password = prompt('🔐 Enter Admin Password:');
+            
+            if (password === null) {
+                return false; // User cancelled
+            }
+            
+            if (password === 'myTAdmin2025') {
+                // Correct password - enable admin access
+                isAdminAuthenticated = true;
+                showAdminButton();
+                startAdminSession();
+                return true;
+            } else if (password === '') {
+                alert('⚠️ Please enter a password');
+                return false;
+            } else {
+                alert('❌ Invalid admin password');
+                return false;
+            }
+        }
+
+        // Show admin button with animation
+        function showAdminButton() {
+            const adminBtn = document.getElementById('adminBtn');
+            if (adminBtn) {
+                // Show button with CSS classes
+                adminBtn.style.display = 'flex';
+                adminBtn.classList.add('authenticated');
+                
+                // Add glow effect
+                setTimeout(() => {
+                    adminBtn.classList.add('show-glow');
+                    setTimeout(() => {
+                        adminBtn.classList.remove('show-glow');
+                        adminBtn.classList.add('session-active');
+                    }, 2000);
+                }, 100);
+            }
+        }
+
+        // Hide admin button
+        function hideAdminButton() {
+            const adminBtn = document.getElementById('adminBtn');
+            if (adminBtn) {
+                adminBtn.classList.remove('authenticated', 'session-active', 'show-glow');
+                
+                setTimeout(() => {
+                    adminBtn.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        // Start admin session with timeout
+        function startAdminSession() {
+            // Clear any existing timeout
+            if (adminSessionTimeout) {
+                clearTimeout(adminSessionTimeout);
+            }
+            
+            // Set session timeout (10 minutes)
+            adminSessionTimeout = setTimeout(() => {
+                isAdminAuthenticated = false;
+                hideAdminButton();
+                console.log('Admin session expired');
+            }, 10 * 60 * 1000); // 10 minutes
+            
+            console.log('Admin session started (10 minutes)');
+        }
+
+        // Secret key combination for admin access (Ctrl+Alt+A)
+        let keySequence = [];
+        const secretSequence = ['Control', 'Alt', 'a'];
+        
+        document.addEventListener('keydown', function(event) {
+            // Admin authentication shortcut
+            if (event.ctrlKey && event.altKey && event.key === 'a') {
+                event.preventDefault();
+                if (!isAdminAuthenticated) {
+                    authenticateAdmin();
+                } else {
+                    openAdminPanel();
+                }
+                return;
+            }
+            
+            // Secret sequence detection (for extra security)
+            keySequence.push(event.code);
+            if (keySequence.length > secretSequence.length) {
+                keySequence.shift();
+            }
+            
+            // Check if secret sequence matches
+            if (keySequence.length === secretSequence.length && 
+                keySequence.every((key, index) => key === secretSequence[index])) {
+                event.preventDefault();
+                keySequence = [];
+                if (!isAdminAuthenticated) {
+                    authenticateAdmin();
+                }
+            }
+        });
+
+        // Clear key sequence after inactivity
+        document.addEventListener('keyup', function() {
+            setTimeout(() => {
+                if (keySequence.length > 0) {
+                    keySequence = [];
+                }
+            }, 2000);
+        });
+
+        // Add visual feedback for admin button when visible
+        document.addEventListener('DOMContentLoaded', function() {
+            const adminBtn = document.getElementById('adminBtn');
+            if (adminBtn) {
+                adminBtn.addEventListener('mouseenter', function() {
+                    if (isAdminAuthenticated) {
+                        this.style.transform = 'scale(1.1)';
+                        this.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.5)';
+                    }
+                });
+                
+                adminBtn.addEventListener('mouseleave', function() {
+                    if (isAdminAuthenticated) {
+                        this.style.transform = 'scale(1)';
+                        this.style.boxShadow = 'none';
+                    }
+                });
+            }
+        });
+
+        // Console message for developers
+        console.log('%c🔐 Admin Access Available', 'color: #ffd700; font-size: 14px; font-weight: bold;');
+        console.log('%cUse Ctrl+Shift+Alt+A to authenticate', 'color: #888; font-size: 12px;');
+    </script>
+    <!-- Script with cache busting -->
+    <script src="wheel.js?v=11.4_20250922"></script>
+    
+    <!-- Force cache refresh -->
+    <script>
+        // Add cache-busting mechanism
+        (function() {
+            // Clear any cached data
+            function clearCache() {
+                console.log('🧹 Clearing cache...');
+                
+                // Clear all wheel-related cache
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('wheel') || key.includes('prize') || key.includes('spin') || 
+                               key.includes('inventory') || key.includes('stats'))) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                // Remove identified keys
+                keysToRemove.forEach(key => {
+                    console.log('🧹 Clearing cached data:', key);
+                    localStorage.removeItem(key);
+                });
+                
+                // Clear any session storage data
+                sessionStorage.clear();
+                
+                // Clear any application cache if available
+                if (window.applicationCache && window.applicationCache.update) {
+                    try {
+                        window.applicationCache.update();
+                    } catch (e) {
+                        console.error('Application cache update error:', e);
+                    }
+                }
+            }
+            
+            // Force reload if version mismatch
+            const currentVersion = '11.4_20250922';
+            const storedVersion = localStorage.getItem('wheel_version');
+            
+            if (storedVersion && storedVersion !== currentVersion) {
+                console.log('🔄 Version changed, forcing refresh...');
+                clearCache();
+                localStorage.setItem('wheel_version', currentVersion);
+                window.location.reload(true);
+            } else {
+                localStorage.setItem('wheel_version', currentVersion);
+            }
+            
+            // Add a manual cache clear function to the window object
+            window.clearAppCache = function() {
+                clearCache();
+                alert('Cache cleared successfully! Reloading page...');
+                window.location.reload(true);
+            }
+            
+            // Cache busting is complete
+        })();
+    </script>
+</body>
+</html>

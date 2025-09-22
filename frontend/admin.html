@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - PickerWheel Contest</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #b8c6db;
+            font-size: 1.1rem;
+        }
+
+        .login-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.show {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #00d4ff;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #b8c6db;
+            font-size: 1rem;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section h3 {
+            margin-bottom: 1.5rem;
+            color: #00d4ff;
+            font-size: 1.5rem;
+        }
+
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .inventory-table th,
+        .inventory-table td {
+            padding: 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .inventory-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .inventory-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-available {
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+
+        .status-limited {
+            color: #feca57;
+            font-weight: 600;
+        }
+
+        .status-unavailable {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: rgba(255, 107, 107, 0.2);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .success-message {
+            background: rgba(78, 205, 196, 0.2);
+            border: 2px solid #4ecdc4;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+
+        .replenish-form {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+            margin-top: 1rem;
+        }
+
+        .replenish-form .form-group {
+            margin-bottom: 0;
+        }
+
+        .replenish-form input {
+            min-width: 150px;
+        }
+
+        @media (max-width: 768px) {
+            .replenish-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .inventory-table {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Admin Panel</h1>
+            <p class="subtitle">PickerWheel Contest Management</p>
+        </div>
+
+        <!-- Login Section -->
+        <div class="login-section" id="loginSection">
+            <h3>Admin Authentication</h3>
+            <div class="form-group">
+                <label for="adminPassword">Admin Password:</label>
+                <input type="password" id="adminPassword" placeholder="Enter admin password">
+            </div>
+            <button class="btn" onclick="login()">Login</button>
+            <div id="loginError"></div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div class="admin-panel" id="adminPanel">
+            <!-- Stats Section -->
+            <div class="section">
+                <h3>Contest Statistics</h3>
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Stats will be loaded here -->
+                </div>
+                <button class="btn" onclick="refreshStats()">Refresh Stats</button>
+            </div>
+
+            <!-- Inventory Management -->
+            <div class="section">
+                <h3>Prize Inventory Management</h3>
+                <div class="form-group">
+                    <label for="inventoryDate">Select Date:</label>
+                    <input type="date" id="inventoryDate" onchange="loadInventory()">
+                </div>
+                
+                <table class="inventory-table" id="inventoryTable">
+                    <thead>
+                        <tr>
+                            <th>Prize Name</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th>Initial Qty</th>
+                            <th>Remaining</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryBody">
+                        <!-- Inventory will be loaded here -->
+                    </tbody>
+                </table>
+
+                <!-- Replenish Form -->
+                <div class="replenish-form">
+                    <div class="form-group">
+                        <label for="replenishPrize">Prize ID:</label>
+                        <input type="number" id="replenishPrize" placeholder="Prize ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="replenishQuantity">Quantity:</label>
+                        <input type="number" id="replenishQuantity" placeholder="Quantity" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="replenishDate">Date:</label>
+                        <input type="date" id="replenishDate">
+                    </div>
+                    <button class="btn" onclick="replenishInventory()">Replenish</button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="section">
+                <h3>Admin Actions</h3>
+                <button class="btn" onclick="refreshAllData()">Refresh All Data</button>
+                <button class="btn" onclick="window.location.href='db-manager.html'">Database Manager</button>
+                <button class="btn btn-success" onclick="verifySystem()">Verify System</button>
+                <button class="btn btn-warning" onclick="clearCache()">Clear Cache</button>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        const API_BASE = '/api';
+
+        // Set today's date as default
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inventoryDate').value = today;
+            document.getElementById('replenishDate').value = today;
+        });
+
+        async function login() {
+            const password = document.getElementById('adminPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!password) {
+                showError('Please enter password', errorDiv);
+                return;
+            }
+
+            try {
+                // Test authentication with inventory endpoint
+                const response = await fetch(`${API_BASE}/admin/inventory`, {
+                    headers: {
+                        'Authorization': `Bearer ${password}`
+                    }
+                });
+
+                if (response.ok) {
+                    authToken = password;
+                    document.getElementById('loginSection').style.display = 'none';
+                    document.getElementById('adminPanel').classList.add('show');
+                    
+                    // Load initial data
+                    await refreshAllData();
+                    showSuccess('Login successful!', errorDiv);
+                } else {
+                    showError('Invalid password', errorDiv);
+                }
+            } catch (error) {
+                showError('Login failed: ' + error.message, errorDiv);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+            showMessage('Logged out successfully', 'success');
+        }
+        
+        function clearCache() {
+            try {
+                // Clear localStorage items
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('wheel') || key.includes('prize') || 
+                               key.includes('spin') || key.includes('inventory') || 
+                               key.includes('stats'))) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                
+                // Update version to force refresh on next load
+                localStorage.setItem('wheel_version', '11.4_20250922');
+                
+                // Show success message
+                showMessage('Cache cleared successfully!', 'success');
+                
+                // Refresh data
+                refreshAllData();
+            } catch (error) {
+                console.error('Cache clearing error:', error);
+                showMessage('Error clearing cache: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatsDisplay(data.stats);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function updateStatsDisplay(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <span class="stat-value">${stats.total_wins || 0}</span>
+                    <span class="stat-label">Total Wins Today</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">${stats.unique_users || 0}</span>
+                    <span class="stat-label">Unique Participants</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">${stats.inventory_status ? stats.inventory_status.length : 0}</span>
+                    <span class="stat-label">Available Prizes</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">${stats.prize_breakdown ? stats.prize_breakdown.length : 0}</span>
+                    <span class="stat-label">Prize Types Won</span>
+                </div>
+            `;
+        }
+
+        async function loadInventory() {
+            if (!authToken) return;
+
+            const date = document.getElementById('inventoryDate').value;
+            if (!date) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/inventory?date=${date}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateInventoryDisplay(data.inventory);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Failed to load inventory:', error);
+                showError('Failed to load inventory: ' + error.message);
+            }
+        }
+
+        function updateInventoryDisplay(inventory) {
+            const tbody = document.getElementById('inventoryBody');
+            tbody.innerHTML = '';
+
+            inventory.forEach(item => {
+                const row = document.createElement('tr');
+                
+                let status = 'unavailable';
+                let statusText = 'Unavailable';
+                let statusClass = 'status-unavailable';
+                
+                if (item.is_unlimited) {
+                    status = 'unlimited';
+                    statusText = 'Unlimited';
+                    statusClass = 'status-available';
+                } else if (item.remaining_quantity > 5) {
+                    status = 'available';
+                    statusText = 'Available';
+                    statusClass = 'status-available';
+                } else if (item.remaining_quantity > 0) {
+                    status = 'limited';
+                    statusText = 'Limited';
+                    statusClass = 'status-limited';
+                }
+
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>${item.type}</td>
+                    <td>${item.initial_quantity}</td>
+                    <td>${item.is_unlimited ? '∞' : item.remaining_quantity}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button class="btn" onclick="setReplenishPrize(${item.id})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+                            Replenish
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function setReplenishPrize(prizeId) {
+            document.getElementById('replenishPrize').value = prizeId;
+        }
+
+        async function replenishInventory() {
+            if (!authToken) return;
+
+            const prizeId = document.getElementById('replenishPrize').value;
+            const quantity = document.getElementById('replenishQuantity').value;
+            const date = document.getElementById('replenishDate').value;
+
+            if (!prizeId || !quantity || !date) {
+                showError('Please fill all replenish fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/replenish`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        prize_id: parseInt(prizeId),
+                        quantity: parseInt(quantity),
+                        date: date
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('Inventory replenished successfully!');
+                    await loadInventory(); // Refresh inventory display
+                    
+                    // Clear form
+                    document.getElementById('replenishPrize').value = '';
+                    document.getElementById('replenishQuantity').value = '1';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showError('Failed to replenish inventory: ' + error.message);
+            }
+        }
+
+        async function refreshAllData() {
+            await refreshStats();
+            await loadInventory();
+        }
+        
+        async function verifySystem() {
+            if (!authToken) return;
+            
+            try {
+                // Create a modal for verification results
+                const modal = document.createElement('div');
+                modal.style.position = 'fixed';
+                modal.style.top = '50%';
+                modal.style.left = '50%';
+                modal.style.transform = 'translate(-50%, -50%)';
+                modal.style.background = 'rgba(0, 0, 0, 0.9)';
+                modal.style.padding = '2rem';
+                modal.style.borderRadius = '15px';
+                modal.style.boxShadow = '0 0 20px rgba(0, 212, 255, 0.5)';
+                modal.style.zIndex = '1000';
+                modal.style.width = '80%';
+                modal.style.maxWidth = '800px';
+                modal.style.maxHeight = '80vh';
+                modal.style.overflow = 'auto';
+                
+                // Add title
+                const title = document.createElement('h3');
+                title.textContent = 'System Verification';
+                title.style.color = '#00d4ff';
+                title.style.marginBottom = '1rem';
+                modal.appendChild(title);
+                
+                // Add loading message
+                const loadingMsg = document.createElement('div');
+                loadingMsg.textContent = 'Running system verification...';
+                loadingMsg.style.color = '#ffffff';
+                loadingMsg.style.marginBottom = '1rem';
+                modal.appendChild(loadingMsg);
+                
+                // Add results container
+                const resultsContainer = document.createElement('div');
+                resultsContainer.style.background = 'rgba(0, 0, 0, 0.3)';
+                resultsContainer.style.padding = '1rem';
+                resultsContainer.style.borderRadius = '8px';
+                resultsContainer.style.marginBottom = '1rem';
+                resultsContainer.style.fontFamily = 'monospace';
+                resultsContainer.style.whiteSpace = 'pre-wrap';
+                resultsContainer.style.maxHeight = '50vh';
+                resultsContainer.style.overflow = 'auto';
+                modal.appendChild(resultsContainer);
+                
+                // Add close button
+                const closeButton = document.createElement('button');
+                closeButton.textContent = 'Close';
+                closeButton.className = 'btn btn-danger';
+                closeButton.onclick = () => document.body.removeChild(modal);
+                modal.appendChild(closeButton);
+                
+                // Add modal to body
+                document.body.appendChild(modal);
+                
+                // Run verification tests
+                await runVerificationTests(resultsContainer);
+                
+                // Update loading message
+                loadingMsg.textContent = 'Verification complete!';
+                loadingMsg.style.color = '#4ecdc4';
+                
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError('Verification failed: ' + error.message);
+            }
+        }
+        
+        async function runVerificationTests(resultsContainer) {
+            // Helper function to add a test result
+            function addResult(name, status, message = '') {
+                const resultDiv = document.createElement('div');
+                resultDiv.style.marginBottom = '0.5rem';
+                resultDiv.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+                resultDiv.style.paddingBottom = '0.5rem';
+                
+                const statusSpan = document.createElement('span');
+                statusSpan.textContent = status ? '✅ ' : '❌ ';
+                statusSpan.style.color = status ? '#4ecdc4' : '#ff6b6b';
+                statusSpan.style.fontWeight = 'bold';
+                resultDiv.appendChild(statusSpan);
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = name;
+                nameSpan.style.color = '#ffffff';
+                nameSpan.style.fontWeight = 'bold';
+                resultDiv.appendChild(nameSpan);
+                
+                if (message) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.textContent = message;
+                    messageDiv.style.color = 'rgba(255, 255, 255, 0.7)';
+                    messageDiv.style.marginLeft = '1.5rem';
+                    messageDiv.style.fontSize = '0.9rem';
+                    resultDiv.appendChild(messageDiv);
+                }
+                
+                resultsContainer.appendChild(resultDiv);
+                return status;
+            }
+            
+            // Test 1: Database Connection
+            try {
+                const response = await fetch(`${API_BASE}/admin/check-database`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken
+                    })
+                });
+                
+                const data = await response.json();
+                const dbStatus = data.success;
+                let dbMessage = '';
+                
+                if (dbStatus && data.results) {
+                    dbMessage = 'Tables found: ' + Object.keys(data.results).join(', ');
+                }
+                
+                addResult('Database Connection', dbStatus, dbMessage);
+            } catch (error) {
+                addResult('Database Connection', false, error.message);
+            }
+            
+            // Test 2: Prize Availability
+            try {
+                const response = await fetch(`${API_BASE}/prizes/available`);
+                const data = await response.json();
+                
+                const availStatus = data && Array.isArray(data) && data.length > 0;
+                const availMessage = availStatus ? `${data.length} prizes available today` : 'No prizes available';
+                
+                addResult('Prize Availability', availStatus, availMessage);
+            } catch (error) {
+                addResult('Prize Availability', false, error.message);
+            }
+            
+            // Test 3: CSV Configuration
+            try {
+                const response = await fetch(`${API_BASE}/admin/csv/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        csv_content: ''
+                    })
+                });
+                
+                const data = await response.json();
+                const csvStatus = data.success;
+                let csvMessage = '';
+                
+                if (csvStatus && data.validation_results) {
+                    csvMessage = `Valid prizes: ${data.validation_results.valid_prizes || 0}`;
+                    if (data.validation_results.warnings && data.validation_results.warnings.length > 0) {
+                        csvMessage += `\nWarnings: ${data.validation_results.warnings.length}`;
+                    }
+                }
+                
+                addResult('CSV Configuration', csvStatus, csvMessage);
+            } catch (error) {
+                addResult('CSV Configuration', false, error.message);
+            }
+            
+            // Test 4: Inventory Status
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(`${API_BASE}/admin/inventory?date=${today}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                const invStatus = data.success;
+                let invMessage = '';
+                
+                if (invStatus && data.inventory) {
+                    const categories = {};
+                    data.inventory.forEach(item => {
+                        const category = item.category || 'unknown';
+                        categories[category] = (categories[category] || 0) + 1;
+                    });
+                    
+                    invMessage = 'Categories: ' + Object.entries(categories)
+                        .map(([cat, count]) => `${cat} (${count})`)
+                        .join(', ');
+                }
+                
+                addResult('Inventory Status', invStatus, invMessage);
+            } catch (error) {
+                addResult('Inventory Status', false, error.message);
+            }
+            
+            // Test 5: Daily Limits
+            try {
+                // Get inventory to check for items with daily limits
+                const today = new Date().toISOString().split('T')[0];
+                const invResponse = await fetch(`${API_BASE}/admin/inventory?date=${today}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const invData = await invResponse.json();
+                let limitedItems = [];
+                
+                if (invData.success && invData.inventory) {
+                    limitedItems = invData.inventory.filter(item => 
+                        !item.is_unlimited && item.per_day_limit && item.per_day_limit < 100
+                    );
+                }
+                
+                const limitStatus = limitedItems.length > 0;
+                const limitMessage = limitStatus ? 
+                    `Found ${limitedItems.length} items with daily limits` : 
+                    'No items with daily limits found for today';
+                
+                addResult('Daily Limits', limitStatus, limitMessage);
+            } catch (error) {
+                addResult('Daily Limits', false, error.message);
+            }
+            
+            // Test 6: Server-Authoritative Wheel
+            try {
+                // Test a spin to verify server-authoritative wheel
+                const spinResponse = await fetch(`${API_BASE}/admin/test-spin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        user_id: 'system_verifier',
+                        test_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                const spinData = await spinResponse.json();
+                const wheelStatus = spinData.success && 
+                                   spinData.sector_index !== undefined && 
+                                   spinData.sector_center !== undefined;
+                
+                let wheelMessage = '';
+                if (wheelStatus) {
+                    wheelMessage = `Prize: ${spinData.prize.name}, ` +
+                                 `Sector: ${spinData.sector_index}, ` +
+                                 `Angle: ${spinData.sector_center.toFixed(2)}°`;
+                }
+                
+                addResult('Server-Authoritative Wheel', wheelStatus, wheelMessage);
+            } catch (error) {
+                addResult('Server-Authoritative Wheel', false, error.message);
+            }
+            
+            // Test 7: Dynamic Prize Count
+            try {
+                // Get all active prizes to check dynamic prize count
+                const prizesResponse = await fetch(`${API_BASE}/prizes/wheel-display`);
+                const prizesData = await prizesResponse.json();
+                
+                // Test a spin to get sector calculation
+                const spinResponse = await fetch(`${API_BASE}/admin/test-spin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        user_id: 'system_verifier_dynamic',
+                        test_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                const spinData = await spinResponse.json();
+                
+                // Check if sector calculation is dynamic
+                const totalPrizes = prizesData.length;
+                const sectorAngle = 360 / totalPrizes;
+                const expectedSectorCenter = (spinData.sector_index * sectorAngle) + (sectorAngle / 2);
+                const actualSectorCenter = spinData.sector_center;
+                
+                // Allow for small floating point differences
+                const isDynamic = Math.abs(expectedSectorCenter - actualSectorCenter) < 0.1;
+                
+                const dynamicMessage = isDynamic ? 
+                    `Total prizes: ${totalPrizes}, Sector angle: ${sectorAngle.toFixed(2)}°` : 
+                    `Expected: ${expectedSectorCenter.toFixed(2)}°, Actual: ${actualSectorCenter.toFixed(2)}°`;
+                
+                addResult('Dynamic Prize Count', isDynamic, dynamicMessage);
+            } catch (error) {
+                addResult('Dynamic Prize Count', false, error.message);
+            }
+        }
+
+        function showError(message, container = null) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(errorDiv);
+            } else {
+                document.body.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+        }
+
+        function showSuccess(message, container = null) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(successDiv);
+            } else {
+                document.body.appendChild(successDiv);
+                setTimeout(() => successDiv.remove(), 3000);
+            }
+        }
+    </script>
+</body>
+</html>
