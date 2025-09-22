@@ -362,7 +362,7 @@ class DailyPrizeManager:
             conn.close()
 
     def get_available_prizes(self, target_date: date) -> List[Dict]:
-        """Get available prizes for a specific date (from database)"""
+        """Get available prizes for a specific date with daily limit enforcement"""
         date_str = target_date.isoformat()
         
         conn = self.db_manager.get_connection()
@@ -372,22 +372,54 @@ class DailyPrizeManager:
             # First, sync all items to database
             self.sync_all_items_to_database(target_date)
             
-            # Get available prizes from database (quantity > 0)
+            # Get available prizes with daily limit checking
             cursor.execute('''
                 SELECT dp.prize_id as id, dp.name, dp.category, dp.quantity, dp.daily_limit, 
-                       dp.available_dates, dp.emoji, di.remaining_quantity
+                       dp.available_dates, dp.emoji, di.remaining_quantity,
+                       COALESCE(today_wins.wins_today, 0) as wins_today
                 FROM daily_prizes dp
                 JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
-                WHERE dp.date = ? AND di.remaining_quantity > 0
+                LEFT JOIN (
+                    SELECT prize_id, COUNT(*) as wins_today
+                    FROM daily_transactions 
+                    WHERE date = ? AND transaction_type = 'win'
+                    GROUP BY prize_id
+                ) today_wins ON dp.prize_id = today_wins.prize_id
+                WHERE dp.date = ? 
+                  AND di.remaining_quantity > 0
+                  AND COALESCE(today_wins.wins_today, 0) < dp.daily_limit
                 ORDER BY dp.prize_id
-            ''', (date_str,))
+            ''', (date_str, date_str))
             
             available_prizes = []
             for row in cursor.fetchall():
                 prize = dict(row)
                 available_prizes.append(prize)
             
-            logger.info(f"Found {len(available_prizes)} available prizes for {date_str}")
+            logger.info(f"Found {len(available_prizes)} available prizes for {date_str} (after daily limit filtering)")
+            
+            # Debug logging for daily limits
+            if logger.isEnabledFor(logging.DEBUG):
+                cursor.execute('''
+                    SELECT dp.name, dp.daily_limit, COALESCE(today_wins.wins_today, 0) as wins_today,
+                           di.remaining_quantity
+                    FROM daily_prizes dp
+                    JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
+                    LEFT JOIN (
+                        SELECT prize_id, COUNT(*) as wins_today
+                        FROM daily_transactions 
+                        WHERE date = ? AND transaction_type = 'win'
+                        GROUP BY prize_id
+                    ) today_wins ON dp.prize_id = today_wins.prize_id
+                    WHERE dp.date = ?
+                    ORDER BY dp.name
+                ''', (date_str, date_str))
+                
+                logger.debug(f"Daily limit status for {date_str}:")
+                for row in cursor.fetchall():
+                    status = "AVAILABLE" if row['wins_today'] < row['daily_limit'] and row['remaining_quantity'] > 0 else "EXHAUSTED"
+                    logger.debug(f"  {row['name']}: {row['wins_today']}/{row['daily_limit']} daily, {row['remaining_quantity']} remaining - {status}")
+            
             return available_prizes
             
         except Exception as e:
@@ -397,38 +429,86 @@ class DailyPrizeManager:
             conn.close()
     
     def select_prize_with_priority(self, target_date: date, user_identifier: str) -> Optional[Dict]:
-        """Select a prize with priority for rare/ultra rare items"""
+        """Select a prize with priority for rare/ultra rare items and daily limit enforcement"""
         available_prizes = self.get_available_prizes(target_date)
         
         if not available_prizes:
+            logger.warning(f"No available prizes for {target_date}")
             return None
-            
+        
         # Separate prizes by category
-        ultra_rare = [p for p in available_prizes if p['category'] == 'ultra_rare']
-        rare = [p for p in available_prizes if p['category'] == 'rare']
-        common = [p for p in available_prizes if p['category'] == 'common']
+        ultra_rare = [p for p in available_prizes if p['category'].lower() == 'ultra_rare']
+        rare = [p for p in available_prizes if p['category'].lower() == 'rare']
+        common = [p for p in available_prizes if p['category'].lower() == 'common']
         
-        # Priority logic: Ultra Rare > Rare > Common
-        # 80% chance to pick from available rare/ultra rare items
-        # 20% chance to pick from common items
-        selected_prize = None
+        logger.info(f"Prize availability: {len(ultra_rare)} ultra-rare, {len(rare)} rare, {len(common)} common")
         
-        if (ultra_rare or rare) and random.random() < 0.8:
-            # Pick from rare/ultra rare items
-            if ultra_rare:
-                selected_prize = random.choice(ultra_rare)
-            elif rare:
-                selected_prize = random.choice(rare)
+        # Get today's win statistics for better distribution
+        date_str = target_date.isoformat()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
         
-        # If no rare item selected, pick from common
-        if not selected_prize and common:
-            selected_prize = random.choice(common)
-        
-        # Fallback to any available prize
-        if not selected_prize:
-            selected_prize = random.choice(available_prizes)
-        
-        return selected_prize
+        try:
+            # Get today's win statistics
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_wins,
+                    SUM(CASE WHEN dp.category IN ('rare', 'ultra_rare') THEN 1 ELSE 0 END) as rare_wins
+                FROM daily_transactions dt
+                JOIN daily_prizes dp ON dt.prize_id = dp.prize_id AND dt.date = dp.date
+                WHERE dt.date = ? AND dt.transaction_type = 'win'
+            ''', (date_str,))
+            
+            stats = cursor.fetchone()
+            total_wins = stats['total_wins'] if stats and stats['total_wins'] else 0
+            rare_wins = stats['rare_wins'] if stats and stats['rare_wins'] else 0
+            
+            # Calculate rare item percentage
+            rare_percentage = rare_wins / total_wins if total_wins > 0 else 0
+            target_rare_percentage = 0.30  # Target 30% rare items
+            
+            logger.info(f"Today's stats: {total_wins} total wins, {rare_wins} rare wins ({rare_percentage:.1%})")
+            
+            # Force rare item selection if we're below target and rare items are available
+            force_rare = (rare_percentage < target_rare_percentage) and (ultra_rare or rare)
+            
+            # Selection logic with enhanced rare item priority
+            selected_prize = None
+            
+            if force_rare or ((ultra_rare or rare) and random.random() < 0.5):
+                # 50% chance for rare items, or forced if below target
+                logger.info("🎯 Selecting from rare/ultra-rare items")
+                if ultra_rare and random.random() < 0.3:  # 30% chance for ultra-rare if available
+                    selected_prize = random.choice(ultra_rare)
+                    logger.info(f"Selected ultra-rare: {selected_prize['name']}")
+                elif rare:
+                    selected_prize = random.choice(rare)
+                    logger.info(f"Selected rare: {selected_prize['name']}")
+            
+            # If no rare item selected, pick from common
+            if not selected_prize and common:
+                selected_prize = random.choice(common)
+                logger.info(f"Selected common: {selected_prize['name']}")
+            
+            # Final fallback to any available prize
+            if not selected_prize:
+                selected_prize = random.choice(available_prizes)
+                logger.info(f"Fallback selection: {selected_prize['name']}")
+            
+            # Log selection details
+            if selected_prize:
+                logger.info(f"🎲 Prize selected: {selected_prize['name']} ({selected_prize['category']}) - "
+                           f"Wins today: {selected_prize.get('wins_today', 0)}/{selected_prize['daily_limit']}, "
+                           f"Remaining: {selected_prize['remaining_quantity']}")
+            
+            return selected_prize
+            
+        except Exception as e:
+            logger.error(f"Error in prize selection: {e}")
+            # Fallback to simple random selection
+            return random.choice(available_prizes) if available_prizes else None
+        finally:
+            conn.close()
     
     def consume_prize(self, prize_id: int, prize_name: str, target_date: date, user_identifier: str) -> bool:
         """Consume a prize and record transaction"""
