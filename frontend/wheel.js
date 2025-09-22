@@ -820,109 +820,33 @@ class PickerWheelUI {
         document.body.classList.add('spinning');
 
         try {
-            console.log('🔍 === DEBUG SPIN FLOW - TRACING EVERY STEP ===');
+            console.log('🔍 === SIMPLIFIED SPIN FLOW ===');
             
-            // Generate idempotency key for this spin session
-            const idempotencyKey = this.generateIdempotencyKey();
-            console.log(`🔑 Generated idempotency key: ${idempotencyKey}`);
+            // === STEP 1: BACKEND DETERMINES AVAILABLE PRIZE ===
+            console.log('📡 Step 1: Backend determining available prize...');
+            const availablePrize = await this.getBackendSelectedPrize();
             
-            // === DEBUG: LOG INITIAL WHEEL STATE ===
-            console.log('🔍 DEBUG: Initial wheel state');
-            console.log(`   Current rotation: ${this.currentRotation}°`);
-            console.log(`   Total segments: ${this.segments.length}`);
-            console.log(`   Segment angle: ${360 / this.segments.length}°`);
-            console.log(`   First 5 segments:`, this.segments.slice(0, 5).map((s, i) => `${i}: ID${s.id} ${s.name}`));
+            // === STEP 2: FRONTEND CALCULATES WHEEL ROTATION ===
+            console.log('🔄 Step 2: Calculating wheel rotation...');
+            const rotationData = await this.calculateWheelRotation(availablePrize);
             
-            // === PHASE 1: SERVER DECIDES PRIZE AND CALCULATES ROTATION ===
-            console.log('📡 Phase 1: Server deciding prize and calculating rotation...');
-            const serverDecision = await this.requestServerPrizeDecision(idempotencyKey);
+            // === STEP 3: ANIMATE WHEEL TO TARGET POSITION ===
+            console.log('🎡 Step 3: Animating wheel to target position...');
+            await this.animateWheelToPosition(rotationData.totalRotation);
             
-            // === DEBUG: LOG SERVER DECISION DETAILS ===
-            console.log('🔍 DEBUG: Server decision analysis');
-            console.log(`   Server selected prize ID: ${serverDecision.prize.id}`);
-            console.log(`   Server selected prize name: ${serverDecision.prize.name}`);
-            console.log(`   Server assigned sector: ${serverDecision.sector_index}`);
-            console.log(`   Server sector center: ${serverDecision.sector_center}°`);
+            // === STEP 4: VERIFY ALIGNMENT ===
+            console.log('✅ Step 4: Verifying wheel alignment...');
+            const alignment = this.verifyWheelAlignment(availablePrize, rotationData.targetSegment);
             
-            // === DEBUG: VERIFY WHEEL MAPPING ===
-            const wheelPrizeAtSector = this.segments[serverDecision.sector_index];
-            console.log('🔍 DEBUG: Wheel mapping verification');
-            console.log(`   Wheel segment ${serverDecision.sector_index}:`, wheelPrizeAtSector ? `ID${wheelPrizeAtSector.id} ${wheelPrizeAtSector.name}` : 'UNDEFINED');
-            console.log(`   Mapping match: ${wheelPrizeAtSector && wheelPrizeAtSector.id === serverDecision.prize.id ? '✅ CORRECT' : '❌ MISMATCH'}`);
+            // === STEP 5: BACKEND CONFIRMS AND AWARDS PRIZE ===
+            console.log('🏆 Step 5: Confirming prize award with backend...');
+            const awardedPrize = await this.confirmPrizeWithBackend(availablePrize, rotationData);
             
-            // === PHASE 2: CALCULATE EXACT ROTATION ANGLE ===
-            console.log('🎯 Phase 2: Calculating exact rotation angle...');
-            const rotationData = this.calculatePreciseRotation(serverDecision);
+            // === STEP 6: DISPLAY RESULT ===
+            console.log('🎉 Step 6: Displaying result...');
+            this.showCelebration(awardedPrize);
             
-            // === DEBUG: LOG ROTATION CALCULATIONS ===
-            console.log('🔍 DEBUG: Rotation calculation details');
-            console.log(`   Target sector: ${rotationData.targetSectorIndex}`);
-            console.log(`   Sector center angle: ${rotationData.sectorCenter}°`);
-            console.log(`   Calculated final rotation: ${rotationData.finalRotation}°`);
-            console.log(`   Expected final position: ${rotationData.finalRotation % 360}°`);
-            
-            // === PHASE 3: START SPIN ANIMATION TO CALCULATED POSITION ===
-            console.log('🎡 Phase 3: Starting spin animation to calculated position...');
-            await this.executeSpinAnimation(rotationData);
-            
-            // === DEBUG: LOG POST-ANIMATION STATE ===
-            console.log('🔍 DEBUG: Post-animation analysis');
-            console.log(`   Actual final rotation: ${this.currentRotation}°`);
-            console.log(`   Expected final rotation: ${rotationData.finalRotation % 360}°`);
-            console.log(`   Rotation difference: ${Math.abs(this.currentRotation - (rotationData.finalRotation % 360))}°`);
-            
-            // === PHASE 4: VERIFY PERFECT LANDING ===
-            console.log('✅ Phase 4: Verifying perfect landing...');
-            const verification = this.verifyPreciseLanding(serverDecision, rotationData);
-            
-            // === DEBUG: DETAILED LANDING ANALYSIS ===
-            console.log('🔍 DEBUG: Detailed landing analysis');
-            const segmentAngle = 360 / this.segments.length;
-            const wheelPosition = this.currentRotation % 360;
-            const sectorAtPointer = (360 - wheelPosition) % 360;
-            const calculatedSector = Math.floor(sectorAtPointer / segmentAngle);
-            
-            console.log(`   Wheel final position: ${wheelPosition}°`);
-            console.log(`   Sector at pointer: ${sectorAtPointer}°`);
-            console.log(`   Calculated sector: ${calculatedSector}`);
-            console.log(`   Expected sector: ${serverDecision.sector_index}`);
-            console.log(`   Landed prize:`, verification.landedPrize ? `ID${verification.landedPrize.id} ${verification.landedPrize.name}` : 'UNDEFINED');
-            console.log(`   Expected prize:`, `ID${serverDecision.prize.id} ${serverDecision.prize.name}`);
-            
-            // === PHASE 5: DISPLAY SERVER-AUTHORIZED RESULT ===
-            console.log('🎉 Phase 5: Displaying server-authorized result...');
-            
-            // === DEBUG: LOG WHAT WILL BE DISPLAYED ===
-            console.log('🔍 DEBUG: Display decision');
-            console.log(`   Will display server prize: ID${serverDecision.prize.id} ${serverDecision.prize.name}`);
-            console.log(`   Wheel actually landed on: ID${verification.landedPrize?.id} ${verification.landedPrize?.name}`);
-            console.log(`   Display choice: SERVER-AUTHORITATIVE (showing server selection regardless of visual)`);
-            
-            // Show celebration for the prize
-            this.displayServerAuthorizedResult(serverDecision);
-            
-            // === PHASE 6: FINALIZE AWARD WITH SERVER ===
-            try {
-                console.log('🎖 Phase 6: Finalizing award with server...');
-                await this.confirmReceiptAndFinalize(serverDecision, idempotencyKey);
-            } catch (error) {
-                // Just log the error but don't show it to the user
-                // The prize has already been displayed, and the backend will handle inventory
-                console.error('❌ Finalization logging:', error);
-                
-                // For analytics purposes, track the error type
-                if (error.message && error.message.includes('daily limit')) {
-                    console.warn('⚠️ Daily limit reached for prize:', serverDecision.prize.name);
-                    // We could send an analytics event here if needed
-                } else if (error.message && error.message.includes('out of stock')) {
-                    console.warn('⚠️ Prize out of stock:', serverDecision.prize.name);
-                    // We could send an analytics event here if needed
-                }
-                
-                // Don't show any error to the user - they've already seen the celebration
-            }
-            
-            console.log('🔍 === DEBUG FLOW COMPLETED - CHECK LOGS ABOVE FOR ISSUES ===');
+            console.log('✅ Spin completed successfully!');
             
         } catch (error) {
             console.error('❌ Spin failed:', error);
@@ -938,49 +862,62 @@ class PickerWheelUI {
         }
     }
 
+
     calculateExactRotation(targetSegmentIndex) {
         // Calculate the exact rotation needed to land on target segment
         const segmentAngle = 360 / this.segments.length;
         
-        // Calculate where the target segment center should be
-        // Segment 0 starts at 0°, segment 1 at segmentAngle°, etc.
+        // Calculate the center of the target segment
         const targetSegmentCenter = targetSegmentIndex * segmentAngle + (segmentAngle / 2);
         
-        // The pointer is at the top (0°). To align the target segment with the pointer,
-        // we need the wheel to be positioned so that the target segment center is at 0°.
-        // This means we need to rotate the wheel by: -targetSegmentCenter
-        // But since we want positive rotation, we use: 360° - targetSegmentCenter
-        
-        let targetFinalRotation = 360 - targetSegmentCenter;
+        // CORRECTED LOGIC: To have segment X at the pointer (0°), the wheel needs to rotate
+        // so that the segment center aligns with the pointer.
+        // If segment 0 center is at 8.57°, to put it at pointer (0°), wheel rotates 8.57°
+        // If segment 12 center is at 214.29°, to put it at pointer (0°), wheel rotates 214.29°
+        let targetFinalPosition = targetSegmentCenter;
         
         // Normalize to 0-360 range
-        targetFinalRotation = targetFinalRotation % 360;
-        if (targetFinalRotation < 0) targetFinalRotation += 360;
+        targetFinalPosition = targetFinalPosition % 360;
+        if (targetFinalPosition < 0) targetFinalPosition += 360;
         
-        // Calculate how much we need to rotate from current position
-        const currentNormalized = this.currentRotation % 360;
-        let rotationNeeded = targetFinalRotation - currentNormalized;
+        // Get current wheel position (normalized to 0-360)
+        const currentPosition = this.currentRotation % 360;
         
-        // Always rotate forward (positive direction)
+        // Calculate the minimum rotation needed to reach target
+        let rotationNeeded = targetFinalPosition - currentPosition;
+        
+        // Ensure we always rotate in the positive direction and add exciting spins
         if (rotationNeeded <= 0) {
-            rotationNeeded += 360;
+            rotationNeeded += 360; // Complete at least one full rotation
         }
         
-        // Add exciting full rotations (8-12 spins)
-        const extraSpins = 8 + Math.random() * 4;
-        const totalRotation = this.currentRotation + (extraSpins * 360) + rotationNeeded;
+        // Add exciting full rotations (8-12 additional spins for visual effect)
+        // CRITICAL: Must be whole numbers to maintain precision
+        const extraSpins = Math.floor(8 + Math.random() * 4);
+        const totalRotationIncrement = rotationNeeded + (extraSpins * 360);
         
-        console.log(`🎯 Target segment: ${targetSegmentIndex}`);
-        console.log(`📐 Segment center angle: ${targetSegmentCenter}°`);
-        console.log(`🎯 Target final rotation: ${targetFinalRotation}°`);
-        console.log(`🔄 Current: ${currentNormalized}°, needed: ${rotationNeeded}°`);
-        console.log(`🎡 Total rotation: ${totalRotation}° (${extraSpins.toFixed(1)} extra spins)`);
+        // Calculate the final absolute rotation
+        const finalAbsoluteRotation = this.currentRotation + totalRotationIncrement;
+        
+        console.log(`🎯 ROTATION CALCULATION (CORRECTED):`);
+        console.log(`   Target segment: ${targetSegmentIndex}`);
+        console.log(`   Segment center angle: ${targetSegmentCenter}°`);
+        console.log(`   Target final position: ${targetFinalPosition}° (CORRECTED: segment center at pointer)`);
+        console.log(`   Current position: ${currentPosition}° (absolute: ${this.currentRotation}°)`);
+        console.log(`   Rotation needed: ${rotationNeeded}°`);
+        console.log(`   Extra spins: ${extraSpins.toFixed(1)} (${(extraSpins * 360)}°)`);
+        console.log(`   Total rotation increment: ${totalRotationIncrement}°`);
+        console.log(`   Final absolute rotation: ${finalAbsoluteRotation}°`);
         
         // Verify our math
-        const predictedFinal = totalRotation % 360;
-        console.log(`🔍 Predicted final position: ${predictedFinal}° (should be ~${targetFinalRotation}°)`);
+        const predictedFinalPosition = finalAbsoluteRotation % 360;
+        console.log(`🔍 Predicted final position: ${predictedFinalPosition}° (should be ~${targetFinalPosition}°)`);
         
-        return totalRotation;
+        // Double-check: which segment will be at pointer?
+        const predictedSegment = Math.floor(predictedFinalPosition / segmentAngle) % this.segments.length;
+        console.log(`🔍 Predicted segment at pointer: ${predictedSegment} (should be ${targetSegmentIndex})`);
+        
+        return finalAbsoluteRotation;
     }
 
     async animateWheelToPosition(targetRotation) {
@@ -1002,7 +939,7 @@ class PickerWheelUI {
             this.wheelInner.style.transform = `rotate(${targetRotation}deg)`;
             
             // Update current rotation for next spin
-            this.currentRotation = targetRotation % 360;
+            this.currentRotation = targetRotation;
             
             console.log(`🎡 Wheel rotating to ${targetRotation}° (final position: ${this.currentRotation}°)`);
             
@@ -1654,26 +1591,34 @@ class PickerWheelUI {
         const finalRotation = this.currentRotation;
         const segmentAngle = 360 / this.segments.length;
         
-        // Calculate which segment is at the pointer
+        // Calculate which segment is at the pointer (top of wheel)
+        // The pointer is at 0° (top). We need to find which segment is currently at 0°
+        // Since the wheel rotates clockwise, we need to account for the rotation
         const wheelPosition = finalRotation % 360;
-        const segmentAtPointer = (360 - wheelPosition) % 360;
-        const actualLandedSegment = Math.floor(segmentAtPointer / segmentAngle);
-        const boundaryAdjustedSegment = actualLandedSegment >= this.segments.length ? 0 : actualLandedSegment;
         
-        const landedPrize = this.segments[boundaryAdjustedSegment];
+        // The segment at the pointer is determined by how much the wheel has rotated
+        // When the wheel rotates clockwise by X degrees, the segment that was originally at position X is now at the pointer
+        // If wheel rotated 0°, segment 0 is at pointer
+        // If wheel rotated 17.1°, segment 1 is at pointer
+        // If wheel rotated 220.92°, segment 12 is at pointer (220.92 / 17.14 = 12.89, so segment 12)
+        const actualLandedSegment = Math.floor(wheelPosition / segmentAngle) % this.segments.length;
+        
+        const landedPrize = this.segments[actualLandedSegment];
         
         console.log(`🎯 Alignment Check:`);
         console.log(`   Expected: Segment ${targetSegment} (${availablePrize.prize.name})`);
-        console.log(`   Actual: Segment ${boundaryAdjustedSegment} (${landedPrize ? landedPrize.name : 'Unknown'})`);
+        console.log(`   Actual: Segment ${actualLandedSegment} (${landedPrize ? landedPrize.name : 'Unknown'})`);
         console.log(`   Final rotation: ${finalRotation}°`);
+        console.log(`   Wheel position: ${wheelPosition}°`);
+        console.log(`   Segment angle: ${segmentAngle}°`);
         
-        const isAligned = boundaryAdjustedSegment === targetSegment;
+        const isAligned = actualLandedSegment === targetSegment;
         console.log(`   Alignment: ${isAligned ? '✅ PERFECT' : '❌ MISALIGNED'}`);
         
         return {
             isAligned: isAligned,
             expectedSegment: targetSegment,
-            actualSegment: boundaryAdjustedSegment,
+            actualSegment: actualLandedSegment,
             landedPrize: landedPrize
         };
     }

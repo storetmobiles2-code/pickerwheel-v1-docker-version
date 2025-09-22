@@ -1,33 +1,39 @@
 #!/bin/bash
-# Script to start the backend with a clean database
+# Script to start the daily backend
 
-echo "=== STARTING BACKEND WITH CLEAN DATABASE ==="
+echo "=== STARTING DAILY PICKERWHEEL BACKEND ==="
 echo ""
 
 # First, stop any existing backend processes
 echo "🔄 Stopping any existing backend processes..."
-./stop_backend.sh > /dev/null
+pkill -f daily_database_backend.py > /dev/null 2>&1
 
-# Delete the database file
-echo ""
-echo "🔄 Deleting database file..."
-if [ -f "backend/pickerwheel_contest.db" ]; then
-    rm -f backend/pickerwheel_contest.db
-    echo "Database file deleted."
-else
-    echo "No database file found."
+# Check if daily CSV files exist
+echo "🔄 Checking daily CSV files..."
+if [ ! -d "daily_csvs" ]; then
+    echo "❌ Daily CSV directory not found. Generating daily CSV files..."
+    python3 scripts/generate_daily_csv.py
 fi
 
-# Modify the port in backend-api.py
-echo ""
-echo "🔄 Ensuring port is set to 9080..."
-sed -i '' 's/port=[0-9]*/port=9080/g' backend/backend-api.py
+# Check if we have CSV files for today
+TODAY=$(date +%Y-%m-%d)
+CSV_FILE="daily_csvs/prizes_${TODAY}.csv"
 
-# Start the backend
+if [ ! -f "$CSV_FILE" ]; then
+    echo "⚠️  No CSV file for today ($TODAY). Available files:"
+    ls -la daily_csvs/prizes_*.csv | head -5
+    echo ""
+    echo "Using 2025-10-02 as test date..."
+fi
+
+echo "📊 Daily CSV files available:"
+ls daily_csvs/prizes_*.csv | wc -l | xargs echo "   Total files:"
+
+# Start the daily backend
 echo ""
-echo "🔄 Starting backend..."
+echo "🔄 Starting daily backend on port 9082..."
 cd backend
-python3 backend-api.py &
+python3 daily_database_backend.py &
 
 # Wait for the server to start
 echo ""
@@ -35,12 +41,15 @@ echo "Waiting for server to start..."
 sleep 2
 
 # Check if the server is running
-PORT=9080  # Use the fixed port
+PORT=9082  # Use the daily backend port
 
 echo "Checking if server is running on port $PORT..."
 for i in {1..5}; do
-    if curl -s http://localhost:$PORT/api/prizes/available > /dev/null; then
-        echo "✅ Server is running on port $PORT."
+    if curl -s http://localhost:$PORT/api/prizes/wheel-display > /dev/null; then
+        echo "✅ Daily backend is running on port $PORT."
+        echo ""
+        echo "🌐 Access the app at: http://localhost:$PORT"
+        echo "📊 Daily system with transactional history and inventory tracking"
         exit 0
     else
         echo "Waiting... ($i/5)"

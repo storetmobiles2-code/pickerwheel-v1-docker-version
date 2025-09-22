@@ -62,17 +62,19 @@ All documentation has been organized in the `docs` directory:
 
 #### Quick Start (Recommended)
 1. Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop)
-2. Double-click on `import-and-start.bat`
-   - This script will import the Docker image if available, or build it if not
-   - Then it will start the Docker container
+2. Double-click on `start.bat` in the root directory
+   - This script will build the Docker image and start the container
 3. Access the application: `http://localhost:8080`
 
-#### Manual Steps
+#### Import and Run (If you have the Docker image file)
 1. Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop)
-2. If you have the Docker image file: Double-click on `import-docker-image.bat`
-3. Start the Docker container: Double-click on `start-docker.bat`
+2. Make sure `pickerwheel.tar` is in the root directory
+3. Double-click on `import-and-run.bat` in the root directory
 4. Access the application: `http://localhost:8080`
-5. Stop the Docker container: Double-click on `stop-docker.bat`
+
+#### Other Windows Scripts
+- `stop.bat` - Stop the Docker container
+- `show-network.bat` - Display network information for accessing from other devices
 
 For detailed instructions, see [Windows README](WINDOWS_README.md)
 

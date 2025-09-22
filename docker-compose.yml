@@ -2,12 +2,15 @@ services:
   pickerwheel:
     build: .
     ports:
-      - "8080:9080"
+      - "8082:9082"
     volumes:
       - ./backend:/app/backend
       - ./frontend:/app/frontend
       - ./assets:/app/assets
+      - ./daily_csvs:/app/daily_csvs
       - ./itemlist_dates.txt:/app/itemlist_dates.txt
+    environment:
+      - TZ=Asia/Kolkata
     restart: unless-stopped
     # Standard bridge network mode for better compatibility
     # network_mode: "host"  # Commented out as it doesn't work well on macOS

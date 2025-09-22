@@ -18,12 +18,9 @@
 1. **Start Docker Desktop**
    - Make sure Docker Desktop is running before proceeding
 
-2. **Import and Start in One Step**
-   - Double-click on `import-and-start.bat`
-   - This script will:
-     - Import the Docker image if `pickerwheel.tar` exists
-     - Or build the image from source if the file doesn't exist
-     - Start the Docker container automatically
+2. **Start the Container**
+   - Double-click on `start.bat` in the root directory
+   - This script will build the Docker image and start the container
 
 3. **Access the Application**
    - Main Contest: [http://localhost:8080](http://localhost:8080)
@@ -31,39 +28,60 @@
    - Admin Password: `myTAdmin2025` (Use Ctrl+Alt+A to access)
 
 4. **Stop the Container When Done**
-   - Double-click on `stop-docker.bat`
+   - Double-click on `stop.bat` in the root directory
 
-### Method 1: Using the Docker Image File
+### Import and Run (If you have the Docker image file)
 
 1. **Start Docker Desktop**
    - Make sure Docker Desktop is running before proceeding
 
-2. **Import the Docker Image**
-   - Make sure `pickerwheel.tar` is in the same directory as the scripts
-   - Double-click on `import-docker-image.bat`
-   - Wait for the import to complete
+2. **Import and Start in One Step**
+   - Make sure `pickerwheel.tar` is in the root directory
+   - Double-click on `import-and-run.bat` in the root directory
+   - This will import the Docker image and start the container
 
-3. **Start the PickerWheel Container**
-   - Double-click on `start-docker.bat`
-
-4. **Access the Application**
+3. **Access the Application**
    - Main Contest: [http://localhost:8080](http://localhost:8080)
    - Admin Panel: [http://localhost:8080/admin.html](http://localhost:8080/admin.html)
    - Admin Password: `myTAdmin2025` (Use Ctrl+Alt+A to access)
 
-5. **Stop the Container**
-   - Double-click on `stop-docker.bat`
+4. **Stop the Container**
+   - Double-click on `stop.bat` in the root directory
 
-### Method 2: Building from Source
+## Available Scripts
 
-1. **Start Docker Desktop**
+### Root Directory Scripts
 
-2. **Start the PickerWheel Container**
-   - Double-click on `start-docker.bat`
-   - This will build the Docker image and start the container
+- `start.bat` - Build and start the Docker container
+- `stop.bat` - Stop the Docker container
+- `import-and-run.bat` - Import the Docker image and start the container
+- `show-network.bat` - Display network information for accessing from other devices
 
-3. **Access the Application**
-   - Same as Method 1
+### Scripts Directory
+
+All scripts are also available in the `scripts` directory with more advanced options:
+
+- `scripts/start-docker.bat` - Build and start the Docker container
+- `scripts/stop-docker.bat` - Stop the Docker container
+- `scripts/import-docker-image.bat` - Import the Docker image
+- `scripts/import-and-start.bat` - Import the Docker image and start the container
+- `scripts/show-ip-info.bat` - Display detailed network information
+- `scripts/network-info.bat` - Display basic network information
+- `scripts/view-logs.bat` - View Docker container logs
+
+## Network Access
+
+To access the application from other devices on your network (like mobile phones or tablets):
+
+1. **Find Your IP Address**
+   - Double-click on `show-network.bat` in the root directory
+   - This will display all your IP addresses and formatted URLs
+   - Use the displayed URLs on your mobile device
+
+2. **Alternative Method**
+   - Navigate to the `scripts` directory
+   - Double-click on `network-info.bat` or `show-ip-info.bat`
+   - These will show network information and test if port 8080 is accessible
 
 ## Troubleshooting
 

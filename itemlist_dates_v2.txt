@@ -1,0 +1,33 @@
+# PickerWheel Item Configuration File v2.0
+# Format: ID,Item Name,Category,Quantity,Daily Limit,Available Dates,Emoji,Description
+# Categories: common, rare, ultra_rare
+# Available Dates: * (all days) or specific dates separated by |
+# Emoji: Optional emoji for display
+# Description: Optional description
+
+# Common Items (ID: 1-6)
+1,smartwatch + mini cooler,common,100,100,*,⌚,Smartwatch with mini cooler combo
+2,power bank + neckband,common,100,100,*,🔋,Power bank with neckband combo
+3,luggage bags,common,100,100,*,🧳,Travel luggage bags
+4,Free pouch and screen guard,common,10,5,*,📱,Free pouch and screen guard
+5,Dinner Set,common,20,5,*,🍽️,Complete dinner set
+6,Earbuds and G.Speaker,common,10,3,*,🎧,Earbuds and gaming speaker combo
+
+# Rare Items (ID: 7-14)
+7,jio tab,rare,2,1,2025-10-02|2025-10-07|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28,📱,Jio tablet
+8,intex home theatre,rare,4,1,*,🎵,Intex home theatre system
+9,zebronics home theatre,rare,6,1,2025-09-24|2025-10-04|2025-10-19|2025-10-20|2025-10-21|2025-10-23,🎵,Zebronics home theatre system
+10,Mi smart speaker,rare,1,1,2025-10-02,🔊,Mi smart speaker
+11,zebronics astra BT speaker,rare,9,1,*,🔊,Zebronics Astra Bluetooth speaker
+12,boult 60w soundbar,rare,6,1,2025-09-30|2025-10-02|2025-10-19|2025-10-20|2025-10-21|2025-10-22,🔊,Boult 60W soundbar
+13,gas stove,rare,3,1,2025-09-23|2025-10-02|2025-10-18,🔥,Gas stove
+14,Mixer Grinder,rare,6,1,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20,⚡,Mixer grinder
+15,pressure cooker,rare,5,1,*,🍲,Pressure cooker
+
+# Ultra Rare Items (ID: 16-21)
+16,Smart Tv 32 inches,ultra_rare,1,1,2025-10-20,📺,32 inch Smart TV
+17,silver coin,ultra_rare,2,1,2025-09-22|2025-10-01|2025-10-21,🪙,Silver coin
+18,refrigerator,ultra_rare,1,1,2025-10-02,❄️,Refrigerator
+19,washing machine,ultra_rare,3,1,2025-09-28|2025-10-20|2025-10-21,🧺,Washing machine
+20,aircooler,ultra_rare,2,1,2025-10-01|2025-10-21,🌬️,Air cooler
+21,Budget Smartphone,ultra_rare,1,1,2025-10-02,📱,Budget smartphone

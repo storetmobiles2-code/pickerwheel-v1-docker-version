@@ -4,8 +4,9 @@ Item,Category,Quantity,Daily Limit,Available Dates
 smartwatch + mini cooler,Common,100,100,*
 power bank + neckband,Common,100,100,*
 luggage bags,Common,100,100,*
-pressure cooker,Common,100,100,*
-Free pouch and screen guard,Common,100,100,*
+Free pouch and screen guard,Common,10,5,*
+Dinner Set,Common,20,5,*
+Earbuds and G.Speaker,Common,10,3,*
 
 # Rare Items
 jio tab,Rare,2,1,2025-10-02|2025-10-07|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28
@@ -15,7 +16,8 @@ Mi smart speaker,Rare,1,1,2025-10-02
 zebronics astra BT speaker,Rare,9,1,*
 boult 60w soundbar,Rare,6,1,2025-09-30|2025-10-02|2025-10-19|2025-10-20|2025-10-21|2025-10-22
 gas stove,Rare,3,1,2025-09-23|2025-10-02|2025-10-18
-Mixer Grinder,Rare,6,2,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20
+Mixer Grinder,Rare,6,1,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20
+pressure cooker,Common,5,1,*
 
 # Ultra Rare Items
 Smart Tv 32 inches,Ultra Rare,1,1,2025-10-20
