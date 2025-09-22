@@ -112,8 +112,8 @@ def verify_complete_flow():
     total_segments = len(wheel_items)
     segment_angle = 360 / total_segments
     target_segment_center = target_segment * segment_angle + (segment_angle / 2)
-    # CORRECTED: To put segment at pointer, wheel rotates to segment center position
-    target_final_position = target_segment_center
+    # ORIGINAL WORKING LOGIC: 360 - targetSegmentCenter
+    target_final_position = 360 - target_segment_center
     
     # Normalize
     target_final_position = target_final_position % 360
@@ -128,10 +128,11 @@ def verify_complete_flow():
     print("\n🎯 STEP 5: LANDING VERIFICATION")
     print("-" * 40)
     
-    # Simulate final wheel position
+    # Simulate final wheel position using original working logic
     simulated_final_rotation = target_final_position
     wheel_position = simulated_final_rotation % 360
-    calculated_segment = int(wheel_position / segment_angle) % total_segments
+    segment_at_pointer = (360 - wheel_position) % 360
+    calculated_segment = int(segment_at_pointer / segment_angle) % total_segments
     
     print(f"🎡 Simulated final position: {wheel_position:.2f}°")
     print(f"📍 Calculated landing segment: {calculated_segment}")

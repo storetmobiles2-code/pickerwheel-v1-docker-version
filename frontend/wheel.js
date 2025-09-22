@@ -870,11 +870,11 @@ class PickerWheelUI {
         // Calculate the center of the target segment
         const targetSegmentCenter = targetSegmentIndex * segmentAngle + (segmentAngle / 2);
         
-        // CORRECTED LOGIC: To have segment X at the pointer (0°), the wheel needs to rotate
-        // so that the segment center aligns with the pointer.
-        // If segment 0 center is at 8.57°, to put it at pointer (0°), wheel rotates 8.57°
-        // If segment 12 center is at 214.29°, to put it at pointer (0°), wheel rotates 214.29°
-        let targetFinalPosition = targetSegmentCenter;
+        // ORIGINAL WORKING LOGIC: To align the target segment with the pointer,
+        // we need the wheel to be positioned so that the target segment center is at 0°.
+        // This means we need to rotate the wheel by: -targetSegmentCenter
+        // But since we want positive rotation, we use: 360° - targetSegmentCenter
+        let targetFinalPosition = 360 - targetSegmentCenter;
         
         // Normalize to 0-360 range
         targetFinalPosition = targetFinalPosition % 360;
@@ -1596,29 +1596,28 @@ class PickerWheelUI {
         // Since the wheel rotates clockwise, we need to account for the rotation
         const wheelPosition = finalRotation % 360;
         
-        // The segment at the pointer is determined by how much the wheel has rotated
-        // When the wheel rotates clockwise by X degrees, the segment that was originally at position X is now at the pointer
-        // If wheel rotated 0°, segment 0 is at pointer
-        // If wheel rotated 17.1°, segment 1 is at pointer
-        // If wheel rotated 220.92°, segment 12 is at pointer (220.92 / 17.14 = 12.89, so segment 12)
-        const actualLandedSegment = Math.floor(wheelPosition / segmentAngle) % this.segments.length;
+        // ORIGINAL WORKING LOGIC: Calculate which segment is at the pointer
+        const segmentAtPointer = (360 - wheelPosition) % 360;
+        const actualLandedSegment = Math.floor(segmentAtPointer / segmentAngle);
+        const boundaryAdjustedSegment = actualLandedSegment >= this.segments.length ? 0 : actualLandedSegment;
         
-        const landedPrize = this.segments[actualLandedSegment];
+        const landedPrize = this.segments[boundaryAdjustedSegment];
         
         console.log(`🎯 Alignment Check:`);
         console.log(`   Expected: Segment ${targetSegment} (${availablePrize.prize.name})`);
-        console.log(`   Actual: Segment ${actualLandedSegment} (${landedPrize ? landedPrize.name : 'Unknown'})`);
+        console.log(`   Actual: Segment ${boundaryAdjustedSegment} (${landedPrize ? landedPrize.name : 'Unknown'})`);
         console.log(`   Final rotation: ${finalRotation}°`);
         console.log(`   Wheel position: ${wheelPosition}°`);
         console.log(`   Segment angle: ${segmentAngle}°`);
+        console.log(`   Segment at pointer: ${segmentAtPointer}°`);
         
-        const isAligned = actualLandedSegment === targetSegment;
+        const isAligned = boundaryAdjustedSegment === targetSegment;
         console.log(`   Alignment: ${isAligned ? '✅ PERFECT' : '❌ MISALIGNED'}`);
         
         return {
             isAligned: isAligned,
             expectedSegment: targetSegment,
-            actualSegment: actualLandedSegment,
+            actualSegment: boundaryAdjustedSegment,
             landedPrize: landedPrize
         };
     }
