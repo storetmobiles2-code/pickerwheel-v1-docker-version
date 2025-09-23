@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>myT MOBILES - Spin & Win Contest</title>
     
     <!-- Fonts -->
@@ -64,7 +64,7 @@
         <div class="lucky-draw-section">
             <div class="lucky-draw-box">
                 <div class="lucky-draw-animation-container">
-                    <div id="animated-scooty" class="lucky-draw-icon">🛵</div>
+                    <div class="yamaha-scooter"></div>
                 </div>
                 <div class="lucky-draw-content">
                     <h3 class="lucky-draw-title">Lucky Draw: Get a chance to win a Yamaha Fascino</h3>
@@ -113,6 +113,40 @@
                 <!-- Prize details will be shown here -->
             </div>
             <button class="close-button" id="closeModal">Claim Prize</button>
+        </div>
+    </div>
+
+    <!-- Daily Prizes Log -->
+    <div class="daily-prizes-log-container">
+        <div class="daily-prizes-header">
+            <h3>🏆 Today's Prizes Won</h3>
+            <div class="log-controls">
+                <button id="refreshLogBtn" class="log-btn">🔄 Refresh</button>
+                <button id="clearLogBtn" class="log-btn clear-btn">🗑️ Clear Display</button>
+            </div>
+        </div>
+        
+        <div class="daily-prizes-table-container">
+            <table class="daily-prizes-table" id="dailyPrizesTable">
+                <thead>
+                    <tr>
+                        <th>🎁 Prize</th>
+                        <th>⏰ Time</th>
+                        <th>👤 User</th>
+                        <th>🏷️ Category</th>
+                    </tr>
+                </thead>
+                <tbody id="dailyPrizesTableBody">
+                    <tr class="no-data-row">
+                        <td colspan="4">No prizes won today yet. Spin the wheel to get started! 🎯</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="log-stats" id="logStats">
+            <span class="stat-item">📊 Total: <span id="totalPrizesCount">0</span></span>
+            <span class="stat-item">⏰ Last updated: <span id="lastUpdated">Never</span></span>
         </div>
     </div>
 

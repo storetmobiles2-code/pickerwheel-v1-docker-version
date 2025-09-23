@@ -4,9 +4,9 @@
 echo "=== STOPPING ALL BACKEND PROCESSES ==="
 echo ""
 
-# Find all Python processes running backend-api.py
-echo "🔍 Finding backend processes..."
-PIDS=$(ps aux | grep "[p]ython" | grep "backend-api.py" | awk '{print $2}')
+# Find all Python processes running daily backend
+echo "🔍 Finding daily backend processes..."
+PIDS=$(ps aux | grep "[p]ython" | grep "daily_database_backend.py" | awk '{print $2}')
 
 if [ -z "$PIDS" ]; then
     echo "No backend processes found."
@@ -29,7 +29,7 @@ done
 
 # Check if any processes are still running
 sleep 1
-REMAINING=$(ps aux | grep "[p]ython" | grep "backend-api.py" | awk '{print $2}')
+REMAINING=$(ps aux | grep "[p]ython" | grep "daily_database_backend.py" | awk '{print $2}')
 if [ -z "$REMAINING" ]; then
     echo ""
     echo "✅ All backend processes stopped successfully."

@@ -22,11 +22,68 @@ class PickerWheelUI {
         this.tickSound = null;
         this.tickInterval = null;
         
+        // 🎵 Enhanced Audio System with Asset Sounds
+        this.audioElements = {
+            spinSound: null,
+            winSound: null,
+            rareWinSound: null
+        };
+        
         // Settings
         this.soundEnabled = true;
         this.effectsEnabled = true;
         
+        // Daily prizes log state
+        this.dailyPrizesLog = [];
+        this.logDisplayHidden = false;
+        
+        // Mobile responsiveness
+        this.isMobile = this.detectMobile();
+        
         this.init();
+    }
+
+    // 📱 MOBILE DETECTION
+    detectMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+               window.innerWidth <= 768;
+    }
+
+    // 🎨 GET COMBO EMOJI DISPLAY
+    getComboEmojiDisplay(prizeName) {
+        const comboMappings = {
+            'smartwatch + mini cooler': '⌚+❄️',
+            'power bank + neckband': '🔋+🎧', 
+            'earbuds and g.speaker': '🎧+🔊'
+        };
+        
+        const normalizedName = prizeName.toLowerCase().trim();
+        return comboMappings[normalizedName] || null;
+    }
+
+    // 📱 GET MOBILE-OPTIMIZED SIZES
+    getMobileSizes() {
+        if (this.isMobile) {
+            return {
+                wheelSize: Math.min(window.innerWidth * 0.9, 450), // 90% of screen width, max 450px
+                fontSize: {
+                    emoji: '16px',
+                    text: '11px',
+                    modal: '4rem'
+                },
+                spinButton: '60px'
+            };
+        } else {
+            return {
+                wheelSize: 400,
+                fontSize: {
+                    emoji: '14px',
+                    text: '10px',
+                    modal: '3rem'
+                },
+                spinButton: '50px'
+            };
+        }
     }
 
     async init() {
@@ -63,6 +120,9 @@ class PickerWheelUI {
             
             // Create wheel
             this.createWheel();
+            
+            // Initialize daily prizes log
+            this.initializeDailyPrizesLog();
             
             console.log('✅ PickerWheel UI initialized successfully');
             
@@ -116,9 +176,77 @@ class PickerWheelUI {
             // Initialize Web Audio API
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             console.log('🔊 Audio system initialized');
+            
+            // 🎵 Load sound assets
+            this.loadSoundAssets();
         } catch (error) {
             console.warn('⚠️ Audio not supported:', error);
         }
+    }
+    
+    loadSoundAssets() {
+        try {
+            // Create audio elements for different sounds
+            this.audioElements.spinSound = new Audio('sounds/spin-sound.mp3');
+            this.audioElements.winSound = new Audio('sounds/win-sound.mp3');
+            this.audioElements.rareWinSound = new Audio('sounds/rare-win-sound.mp3');
+            
+            // Configure audio elements
+            Object.values(this.audioElements).forEach(audio => {
+                if (audio) {
+                    audio.preload = 'auto';
+                    audio.volume = 0.7; // Set default volume
+                    
+                    // Handle loading events
+                    audio.addEventListener('canplaythrough', () => {
+                        console.log('🎵 Sound loaded:', audio.src.split('/').pop());
+                    });
+                    
+                    audio.addEventListener('error', (e) => {
+                        console.warn('⚠️ Failed to load sound:', audio.src.split('/').pop(), e);
+                    });
+                    
+                    // Handle browser audio policy restrictions
+                    audio.addEventListener('play', () => {
+                        console.log('🎵 Audio playing:', audio.src.split('/').pop());
+                    });
+                }
+            });
+            
+            // Add click handler to enable audio context (required by browsers)
+            this.enableAudioOnFirstInteraction();
+            
+            console.log('🎵 Loading sound assets...');
+        } catch (error) {
+            console.warn('⚠️ Failed to initialize sound assets:', error);
+        }
+    }
+    
+    enableAudioOnFirstInteraction() {
+        const enableAudio = () => {
+            // Resume audio context if suspended
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                this.audioContext.resume().then(() => {
+                    console.log('🔊 Audio context enabled on user interaction');
+                });
+            }
+            
+            // Test load all audio elements
+            Object.values(this.audioElements).forEach(audio => {
+                if (audio) {
+                    audio.load(); // Reload to ensure they're ready
+                }
+            });
+            
+            // Remove this listener after first interaction
+            document.removeEventListener('click', enableAudio);
+            document.removeEventListener('touchstart', enableAudio);
+            console.log('🎵 Audio system fully enabled');
+        };
+        
+        // Listen for first user interaction
+        document.addEventListener('click', enableAudio);
+        document.addEventListener('touchstart', enableAudio);
     }
 
     createTickSound(frequency = 800, duration = 0.1, volume = 0.3) {
@@ -219,6 +347,66 @@ class PickerWheelUI {
             console.log('🔇 Ticking sound stopped');
         }
     }
+    
+    // 🎵 Enhanced Sound Methods
+    playSpinSound() {
+        if (!this.soundEnabled || !this.audioElements.spinSound) return;
+        
+        try {
+            this.audioElements.spinSound.currentTime = 0; // Reset to beginning
+            this.audioElements.spinSound.play().catch(e => {
+                console.warn('⚠️ Failed to play spin sound:', e);
+            });
+            console.log('🎵 Playing spin sound');
+        } catch (error) {
+            console.warn('⚠️ Error playing spin sound:', error);
+        }
+    }
+    
+    playWinSound(category = 'common') {
+        if (!this.soundEnabled) return;
+        
+        try {
+            let soundToPlay;
+            
+            // Choose sound based on prize category
+            if (category === 'rare' || category === 'ultra_rare') {
+                soundToPlay = this.audioElements.rareWinSound;
+                console.log('🎵 Playing rare win celebration sound');
+            } else {
+                soundToPlay = this.audioElements.winSound;
+                console.log('🎵 Playing win celebration sound');
+            }
+            
+            if (soundToPlay) {
+                soundToPlay.currentTime = 0; // Reset to beginning
+                soundToPlay.play().catch(e => {
+                    console.warn('⚠️ Failed to play win sound:', e);
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Error playing win sound:', error);
+        }
+    }
+    
+    stopAllSounds() {
+        try {
+            // Stop all audio elements
+            Object.values(this.audioElements).forEach(audio => {
+                if (audio && !audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+            
+            // Stop ticking sound
+            this.stopTickingSound();
+            
+            console.log('🔇 All sounds stopped');
+        } catch (error) {
+            console.warn('⚠️ Error stopping sounds:', error);
+        }
+    }
 
     startSpinningEffects() {
         if (!this.effectsEnabled) return;
@@ -261,7 +449,7 @@ class PickerWheelUI {
                 this.soundToggle.classList.add('disabled');
                 this.soundToggle.title = 'Enable Sound';
                 // Stop any currently playing sound
-                this.stopTickingSound();
+                this.stopAllSounds();
             }
         }
         
@@ -426,7 +614,8 @@ class PickerWheelUI {
     }
 
     createSVGWheel() {
-        const wheelSize = 400;
+        const sizes = this.getMobileSizes();
+        const wheelSize = sizes.wheelSize;
         const centerX = wheelSize / 2;
         const centerY = wheelSize / 2;
         const radius = wheelSize / 2 - 10;
@@ -510,17 +699,26 @@ class PickerWheelUI {
         const emojiX = centerX + emojiRadius * Math.cos(angleRad);
         const emojiY = centerY + emojiRadius * Math.sin(angleRad);
         
-        // Create emoji
-        const emoji = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        emoji.setAttribute('x', emojiX);
-        emoji.setAttribute('y', emojiY);
-        emoji.setAttribute('text-anchor', 'middle');
-        emoji.setAttribute('dominant-baseline', 'middle');
-        emoji.setAttribute('font-size', '12');
-        emoji.setAttribute('fill', '#ffffff');
-        emoji.setAttribute('stroke', '#000000');
-        emoji.setAttribute('stroke-width', '0.3');
-        emoji.textContent = segment.emoji || '🎁';
+        // Create emoji display (combo emojis for combo items, regular emojis for others)
+        const comboEmoji = this.getComboEmojiDisplay(segment.name);
+        const sizes = this.getMobileSizes();
+        
+        const displayElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        displayElement.setAttribute('x', emojiX);
+        displayElement.setAttribute('y', emojiY);
+        displayElement.setAttribute('text-anchor', 'middle');
+        displayElement.setAttribute('dominant-baseline', 'middle');
+        displayElement.setAttribute('font-size', sizes.fontSize.emoji);
+        displayElement.setAttribute('fill', '#ffffff');
+        displayElement.setAttribute('stroke', '#000000');
+        displayElement.setAttribute('stroke-width', '0.3');
+        
+        if (comboEmoji) {
+            displayElement.textContent = comboEmoji;
+            console.log(`🎨 Using combo emoji for ${segment.name}: ${comboEmoji}`);
+        } else {
+            displayElement.textContent = segment.emoji || '🎁';
+        }
         
         // Format text for two lines if needed
         const formattedText = this.formatPrizeNameForTwoLines(segment.name);
@@ -529,24 +727,24 @@ class PickerWheelUI {
         // Create text with proper vertical separation
         if (textLines.length === 1) {
             // Single line - position after emoji
-            this.createTextLine(textGroup, textLines[0], segment.id, 0, centerX, centerY, radius, angleRad);
+            this.createTextLine(textGroup, textLines[0], segment.id, 0, centerX, centerY, radius, angleRad, sizes);
         } else {
             // Two lines - create them with clear vertical separation
             textLines.forEach((line, index) => {
                 if (line.trim()) {
-                    this.createTextLine(textGroup, line.trim(), segment.id, index, centerX, centerY, radius, angleRad);
+                    this.createTextLine(textGroup, line.trim(), segment.id, index, centerX, centerY, radius, angleRad, sizes);
                 }
             });
         }
         
-        // Add emoji to group
-        textGroup.appendChild(emoji);
+        // Add display element (icon or emoji) to group
+        textGroup.appendChild(displayElement);
         
         // Add group to SVG
         svg.appendChild(textGroup);
     }
 
-    createTextLine(textGroup, lineText, segmentId, lineIndex, centerX, centerY, radius, angleRad) {
+    createTextLine(textGroup, lineText, segmentId, lineIndex, centerX, centerY, radius, angleRad, sizes) {
         // Create unique path ID for this text line
         const linePathId = `textPath_${segmentId}_line${lineIndex}`;
         const linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -577,7 +775,7 @@ class PickerWheelUI {
         
         // Create text element for this line
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('font-size', '7');
+        text.setAttribute('font-size', sizes.fontSize.text);
         text.setAttribute('font-weight', 'bold');
         text.setAttribute('fill', '#ffffff');
         text.setAttribute('stroke', '#000000');
@@ -816,113 +1014,40 @@ class PickerWheelUI {
         this.spinButton.disabled = true;
         this.spinButton.textContent = 'SPINNING...';
         
+        // 🎵 Play spin sound at the start
+        this.playSpinSound();
+        
         // Prevent page shake during spin
         document.body.classList.add('spinning');
 
         try {
-            console.log('🔍 === DEBUG SPIN FLOW - TRACING EVERY STEP ===');
+            console.log('🔍 === SIMPLIFIED SPIN FLOW ===');
             
-            // Generate idempotency key for this spin session
-            const idempotencyKey = this.generateIdempotencyKey();
-            console.log(`🔑 Generated idempotency key: ${idempotencyKey}`);
+            // === STEP 1: BACKEND DETERMINES AVAILABLE PRIZE ===
+            console.log('📡 Step 1: Backend determining available prize...');
+            const availablePrize = await this.getBackendSelectedPrize();
             
-            // === DEBUG: LOG INITIAL WHEEL STATE ===
-            console.log('🔍 DEBUG: Initial wheel state');
-            console.log(`   Current rotation: ${this.currentRotation}°`);
-            console.log(`   Total segments: ${this.segments.length}`);
-            console.log(`   Segment angle: ${360 / this.segments.length}°`);
-            console.log(`   First 5 segments:`, this.segments.slice(0, 5).map((s, i) => `${i}: ID${s.id} ${s.name}`));
+            // === STEP 2: FRONTEND CALCULATES WHEEL ROTATION ===
+            console.log('🔄 Step 2: Calculating wheel rotation...');
+            const rotationData = await this.calculateWheelRotation(availablePrize);
             
-            // === PHASE 1: SERVER DECIDES PRIZE AND CALCULATES ROTATION ===
-            console.log('📡 Phase 1: Server deciding prize and calculating rotation...');
-            const serverDecision = await this.requestServerPrizeDecision(idempotencyKey);
+            // === STEP 3: ANIMATE WHEEL TO TARGET POSITION ===
+            console.log('🎡 Step 3: Animating wheel to target position...');
+            await this.animateWheelToPosition(rotationData.totalRotation);
             
-            // === DEBUG: LOG SERVER DECISION DETAILS ===
-            console.log('🔍 DEBUG: Server decision analysis');
-            console.log(`   Server selected prize ID: ${serverDecision.prize.id}`);
-            console.log(`   Server selected prize name: ${serverDecision.prize.name}`);
-            console.log(`   Server assigned sector: ${serverDecision.sector_index}`);
-            console.log(`   Server sector center: ${serverDecision.sector_center}°`);
+            // === STEP 4: VERIFY ALIGNMENT ===
+            console.log('✅ Step 4: Verifying wheel alignment...');
+            const alignment = this.verifyWheelAlignment(availablePrize, rotationData.targetSegment);
             
-            // === DEBUG: VERIFY WHEEL MAPPING ===
-            const wheelPrizeAtSector = this.segments[serverDecision.sector_index];
-            console.log('🔍 DEBUG: Wheel mapping verification');
-            console.log(`   Wheel segment ${serverDecision.sector_index}:`, wheelPrizeAtSector ? `ID${wheelPrizeAtSector.id} ${wheelPrizeAtSector.name}` : 'UNDEFINED');
-            console.log(`   Mapping match: ${wheelPrizeAtSector && wheelPrizeAtSector.id === serverDecision.prize.id ? '✅ CORRECT' : '❌ MISMATCH'}`);
+            // === STEP 5: BACKEND CONFIRMS AND AWARDS PRIZE ===
+            console.log('🏆 Step 5: Confirming prize award with backend...');
+            const awardedPrize = await this.confirmPrizeWithBackend(availablePrize, rotationData);
             
-            // === PHASE 2: CALCULATE EXACT ROTATION ANGLE ===
-            console.log('🎯 Phase 2: Calculating exact rotation angle...');
-            const rotationData = this.calculatePreciseRotation(serverDecision);
+            // === STEP 6: DISPLAY RESULT ===
+            console.log('🎉 Step 6: Displaying result...');
+            this.showCelebration(awardedPrize);
             
-            // === DEBUG: LOG ROTATION CALCULATIONS ===
-            console.log('🔍 DEBUG: Rotation calculation details');
-            console.log(`   Target sector: ${rotationData.targetSectorIndex}`);
-            console.log(`   Sector center angle: ${rotationData.sectorCenter}°`);
-            console.log(`   Calculated final rotation: ${rotationData.finalRotation}°`);
-            console.log(`   Expected final position: ${rotationData.finalRotation % 360}°`);
-            
-            // === PHASE 3: START SPIN ANIMATION TO CALCULATED POSITION ===
-            console.log('🎡 Phase 3: Starting spin animation to calculated position...');
-            await this.executeSpinAnimation(rotationData);
-            
-            // === DEBUG: LOG POST-ANIMATION STATE ===
-            console.log('🔍 DEBUG: Post-animation analysis');
-            console.log(`   Actual final rotation: ${this.currentRotation}°`);
-            console.log(`   Expected final rotation: ${rotationData.finalRotation % 360}°`);
-            console.log(`   Rotation difference: ${Math.abs(this.currentRotation - (rotationData.finalRotation % 360))}°`);
-            
-            // === PHASE 4: VERIFY PERFECT LANDING ===
-            console.log('✅ Phase 4: Verifying perfect landing...');
-            const verification = this.verifyPreciseLanding(serverDecision, rotationData);
-            
-            // === DEBUG: DETAILED LANDING ANALYSIS ===
-            console.log('🔍 DEBUG: Detailed landing analysis');
-            const segmentAngle = 360 / this.segments.length;
-            const wheelPosition = this.currentRotation % 360;
-            const sectorAtPointer = (360 - wheelPosition) % 360;
-            const calculatedSector = Math.floor(sectorAtPointer / segmentAngle);
-            
-            console.log(`   Wheel final position: ${wheelPosition}°`);
-            console.log(`   Sector at pointer: ${sectorAtPointer}°`);
-            console.log(`   Calculated sector: ${calculatedSector}`);
-            console.log(`   Expected sector: ${serverDecision.sector_index}`);
-            console.log(`   Landed prize:`, verification.landedPrize ? `ID${verification.landedPrize.id} ${verification.landedPrize.name}` : 'UNDEFINED');
-            console.log(`   Expected prize:`, `ID${serverDecision.prize.id} ${serverDecision.prize.name}`);
-            
-            // === PHASE 5: DISPLAY SERVER-AUTHORIZED RESULT ===
-            console.log('🎉 Phase 5: Displaying server-authorized result...');
-            
-            // === DEBUG: LOG WHAT WILL BE DISPLAYED ===
-            console.log('🔍 DEBUG: Display decision');
-            console.log(`   Will display server prize: ID${serverDecision.prize.id} ${serverDecision.prize.name}`);
-            console.log(`   Wheel actually landed on: ID${verification.landedPrize?.id} ${verification.landedPrize?.name}`);
-            console.log(`   Display choice: SERVER-AUTHORITATIVE (showing server selection regardless of visual)`);
-            
-            // Show celebration for the prize
-            this.displayServerAuthorizedResult(serverDecision);
-            
-            // === PHASE 6: FINALIZE AWARD WITH SERVER ===
-            try {
-                console.log('🎖 Phase 6: Finalizing award with server...');
-                await this.confirmReceiptAndFinalize(serverDecision, idempotencyKey);
-            } catch (error) {
-                // Just log the error but don't show it to the user
-                // The prize has already been displayed, and the backend will handle inventory
-                console.error('❌ Finalization logging:', error);
-                
-                // For analytics purposes, track the error type
-                if (error.message && error.message.includes('daily limit')) {
-                    console.warn('⚠️ Daily limit reached for prize:', serverDecision.prize.name);
-                    // We could send an analytics event here if needed
-                } else if (error.message && error.message.includes('out of stock')) {
-                    console.warn('⚠️ Prize out of stock:', serverDecision.prize.name);
-                    // We could send an analytics event here if needed
-                }
-                
-                // Don't show any error to the user - they've already seen the celebration
-            }
-            
-            console.log('🔍 === DEBUG FLOW COMPLETED - CHECK LOGS ABOVE FOR ISSUES ===');
+            console.log('✅ Spin completed successfully!');
             
         } catch (error) {
             console.error('❌ Spin failed:', error);
@@ -938,49 +1063,62 @@ class PickerWheelUI {
         }
     }
 
+
     calculateExactRotation(targetSegmentIndex) {
         // Calculate the exact rotation needed to land on target segment
         const segmentAngle = 360 / this.segments.length;
         
-        // Calculate where the target segment center should be
-        // Segment 0 starts at 0°, segment 1 at segmentAngle°, etc.
+        // Calculate the center of the target segment
         const targetSegmentCenter = targetSegmentIndex * segmentAngle + (segmentAngle / 2);
         
-        // The pointer is at the top (0°). To align the target segment with the pointer,
+        // ORIGINAL WORKING LOGIC: To align the target segment with the pointer,
         // we need the wheel to be positioned so that the target segment center is at 0°.
         // This means we need to rotate the wheel by: -targetSegmentCenter
         // But since we want positive rotation, we use: 360° - targetSegmentCenter
-        
-        let targetFinalRotation = 360 - targetSegmentCenter;
+        let targetFinalPosition = 360 - targetSegmentCenter;
         
         // Normalize to 0-360 range
-        targetFinalRotation = targetFinalRotation % 360;
-        if (targetFinalRotation < 0) targetFinalRotation += 360;
+        targetFinalPosition = targetFinalPosition % 360;
+        if (targetFinalPosition < 0) targetFinalPosition += 360;
         
-        // Calculate how much we need to rotate from current position
-        const currentNormalized = this.currentRotation % 360;
-        let rotationNeeded = targetFinalRotation - currentNormalized;
+        // Get current wheel position (normalized to 0-360)
+        const currentPosition = this.currentRotation % 360;
         
-        // Always rotate forward (positive direction)
+        // Calculate the minimum rotation needed to reach target
+        let rotationNeeded = targetFinalPosition - currentPosition;
+        
+        // Ensure we always rotate in the positive direction and add exciting spins
         if (rotationNeeded <= 0) {
-            rotationNeeded += 360;
+            rotationNeeded += 360; // Complete at least one full rotation
         }
         
-        // Add exciting full rotations (8-12 spins)
-        const extraSpins = 8 + Math.random() * 4;
-        const totalRotation = this.currentRotation + (extraSpins * 360) + rotationNeeded;
+        // Add exciting full rotations (8-12 additional spins for visual effect)
+        // CRITICAL: Must be whole numbers to maintain precision
+        const extraSpins = Math.floor(8 + Math.random() * 4);
+        const totalRotationIncrement = rotationNeeded + (extraSpins * 360);
         
-        console.log(`🎯 Target segment: ${targetSegmentIndex}`);
-        console.log(`📐 Segment center angle: ${targetSegmentCenter}°`);
-        console.log(`🎯 Target final rotation: ${targetFinalRotation}°`);
-        console.log(`🔄 Current: ${currentNormalized}°, needed: ${rotationNeeded}°`);
-        console.log(`🎡 Total rotation: ${totalRotation}° (${extraSpins.toFixed(1)} extra spins)`);
+        // Calculate the final absolute rotation
+        const finalAbsoluteRotation = this.currentRotation + totalRotationIncrement;
+        
+        console.log(`🎯 ROTATION CALCULATION (CORRECTED):`);
+        console.log(`   Target segment: ${targetSegmentIndex}`);
+        console.log(`   Segment center angle: ${targetSegmentCenter}°`);
+        console.log(`   Target final position: ${targetFinalPosition}° (CORRECTED: segment center at pointer)`);
+        console.log(`   Current position: ${currentPosition}° (absolute: ${this.currentRotation}°)`);
+        console.log(`   Rotation needed: ${rotationNeeded}°`);
+        console.log(`   Extra spins: ${extraSpins.toFixed(1)} (${(extraSpins * 360)}°)`);
+        console.log(`   Total rotation increment: ${totalRotationIncrement}°`);
+        console.log(`   Final absolute rotation: ${finalAbsoluteRotation}°`);
         
         // Verify our math
-        const predictedFinal = totalRotation % 360;
-        console.log(`🔍 Predicted final position: ${predictedFinal}° (should be ~${targetFinalRotation}°)`);
+        const predictedFinalPosition = finalAbsoluteRotation % 360;
+        console.log(`🔍 Predicted final position: ${predictedFinalPosition}° (should be ~${targetFinalPosition}°)`);
         
-        return totalRotation;
+        // Double-check: which segment will be at pointer?
+        const predictedSegment = Math.floor(predictedFinalPosition / segmentAngle) % this.segments.length;
+        console.log(`🔍 Predicted segment at pointer: ${predictedSegment} (should be ${targetSegmentIndex})`);
+        
+        return finalAbsoluteRotation;
     }
 
     async animateWheelToPosition(targetRotation) {
@@ -1002,7 +1140,7 @@ class PickerWheelUI {
             this.wheelInner.style.transform = `rotate(${targetRotation}deg)`;
             
             // Update current rotation for next spin
-            this.currentRotation = targetRotation % 360;
+            this.currentRotation = targetRotation;
             
             console.log(`🎡 Wheel rotating to ${targetRotation}° (final position: ${this.currentRotation}°)`);
             
@@ -1654,8 +1792,12 @@ class PickerWheelUI {
         const finalRotation = this.currentRotation;
         const segmentAngle = 360 / this.segments.length;
         
-        // Calculate which segment is at the pointer
+        // Calculate which segment is at the pointer (top of wheel)
+        // The pointer is at 0° (top). We need to find which segment is currently at 0°
+        // Since the wheel rotates clockwise, we need to account for the rotation
         const wheelPosition = finalRotation % 360;
+        
+        // ORIGINAL WORKING LOGIC: Calculate which segment is at the pointer
         const segmentAtPointer = (360 - wheelPosition) % 360;
         const actualLandedSegment = Math.floor(segmentAtPointer / segmentAngle);
         const boundaryAdjustedSegment = actualLandedSegment >= this.segments.length ? 0 : actualLandedSegment;
@@ -1666,6 +1808,9 @@ class PickerWheelUI {
         console.log(`   Expected: Segment ${targetSegment} (${availablePrize.prize.name})`);
         console.log(`   Actual: Segment ${boundaryAdjustedSegment} (${landedPrize ? landedPrize.name : 'Unknown'})`);
         console.log(`   Final rotation: ${finalRotation}°`);
+        console.log(`   Wheel position: ${wheelPosition}°`);
+        console.log(`   Segment angle: ${segmentAngle}°`);
+        console.log(`   Segment at pointer: ${segmentAtPointer}°`);
         
         const isAligned = boundaryAdjustedSegment === targetSegment;
         console.log(`   Alignment: ${isAligned ? '✅ PERFECT' : '❌ MISALIGNED'}`);
@@ -1703,6 +1848,9 @@ class PickerWheelUI {
         const awardedPrize = data.prize;
         console.log(`✅ Prize confirmed and awarded: ${awardedPrize.name}`);
         
+        // Add prize to daily log
+        this.addPrizeToLog(awardedPrize);
+        
         // Verify backend didn't change the prize
         if (awardedPrize.id !== availablePrize.prize.id) {
             console.warn('⚠️ Backend changed the prize!');
@@ -1715,6 +1863,9 @@ class PickerWheelUI {
 
     showCelebration(prize) {
         console.log('🎉 Showing prize modal for:', prize.name);
+        
+        // 🎉 ENHANCED CELEBRATION SEQUENCE
+        this.startCelebrationSequence(prize);
         
         // === DEBUG: LOG POPUP DISPLAY DETAILS ===
         console.log('🔍 DEBUG: Popup display details');
@@ -1733,7 +1884,24 @@ class PickerWheelUI {
         console.log(`   Setting emoji to: ${prize.emoji || '🎁'}`);
         console.log(`   Setting name to: ${prize.name}`);
 
-        if (prizeEmoji) prizeEmoji.textContent = prize.emoji || '🎁';
+        if (prizeEmoji) {
+            // Check if this is a combo item first
+            const comboEmoji = this.getComboEmojiDisplay(prize.name);
+            const sizes = this.getMobileSizes();
+            
+            prizeEmoji.innerHTML = '';
+            
+            if (comboEmoji) {
+                // Use combo emoji display for combo items
+                prizeEmoji.textContent = comboEmoji;
+                prizeEmoji.style.fontSize = sizes.fontSize.modal;
+                console.log(`🎨 Using combo emoji in modal for ${prize.name}: ${comboEmoji}`);
+            } else {
+                // Use regular emoji
+                prizeEmoji.textContent = prize.emoji || '🎁';
+                prizeEmoji.style.fontSize = sizes.fontSize.modal;
+            }
+        }
         if (prizeName) prizeName.textContent = prize.name;
         
         if (prizeCategory) {
@@ -1752,10 +1920,316 @@ class PickerWheelUI {
 
         this.modalOverlay.classList.add('show');
     }
+    
+    // 🎉 ENHANCED CELEBRATION SYSTEM
+    startCelebrationSequence(prize) {
+        console.log('🎉 Starting celebration sequence for:', prize.name, 'Category:', prize.category);
+        
+        // Stop any ongoing sounds first
+        this.stopTickingSound();
+        
+        // 1. Play celebration sound with proper timing (1-2 seconds)
+        setTimeout(() => {
+            this.playCelebrationSound(prize.category);
+        }, 300); // Small delay after wheel stops
+        
+        // 2. Start confetti animation
+        setTimeout(() => {
+            this.showConfetti(prize.category);
+        }, 500);
+        
+        // 3. Add celebration effects to modal
+        setTimeout(() => {
+            this.addModalCelebrationEffects(prize.category);
+        }, 200);
+    }
+    
+    playCelebrationSound(category) {
+        if (!this.soundEnabled) {
+            console.log('🔇 Sound disabled, skipping celebration sound');
+            return;
+        }
+        
+        try {
+            let soundToPlay;
+            let duration = 4000; // 4 seconds default
+            
+            // Choose sound and duration based on prize category
+            if (category === 'rare' || category === 'ultra_rare') {
+                soundToPlay = this.audioElements.rareWinSound;
+                duration = 5000; // 5 seconds for rare prizes - more celebration!
+                console.log('🎵 Playing RARE celebration sound for', category);
+            } else {
+                soundToPlay = this.audioElements.winSound;
+                duration = 4000; // 4 seconds for common prizes
+                console.log('🎵 Playing COMMON celebration sound for', category);
+            }
+            
+            if (soundToPlay) {
+                // Reset and play
+                soundToPlay.currentTime = 0;
+                soundToPlay.volume = 0.8; // Slightly louder for celebration
+                
+                const playPromise = soundToPlay.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            console.log('🎵 Celebration sound started successfully');
+                            
+                            // Stop sound after specified duration
+                            setTimeout(() => {
+                                if (!soundToPlay.paused) {
+                                    soundToPlay.pause();
+                                    soundToPlay.currentTime = 0;
+                                    console.log('🔇 Celebration sound stopped after', duration + 'ms');
+                                }
+                            }, duration);
+                        })
+                        .catch(error => {
+                            console.warn('⚠️ Failed to play celebration sound:', error);
+                            // Fallback: try to enable audio context
+                            if (this.audioContext && this.audioContext.state === 'suspended') {
+                                this.audioContext.resume().then(() => {
+                                    console.log('🔊 Audio context resumed, retrying sound...');
+                                    soundToPlay.play().catch(e => console.warn('⚠️ Retry failed:', e));
+                                });
+                            }
+                        });
+                }
+            } else {
+                console.warn('⚠️ No sound element available for category:', category);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error playing celebration sound:', error);
+        }
+    }
+    
+    showConfetti(category) {
+        console.log('🎊 Starting confetti animation for:', category);
+        
+        // Create confetti container
+        const confettiContainer = document.createElement('div');
+        confettiContainer.className = 'confetti-container';
+        confettiContainer.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 10000;
+            overflow: hidden;
+        `;
+        
+        document.body.appendChild(confettiContainer);
+        
+        // Determine confetti intensity based on category
+        const confettiCount = category === 'rare' || category === 'ultra_rare' ? 50 : 30;
+        const colors = category === 'rare' || category === 'ultra_rare' 
+            ? ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8']
+            : ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+        
+        // Create confetti pieces
+        for (let i = 0; i < confettiCount; i++) {
+            setTimeout(() => {
+                this.createConfettiPiece(confettiContainer, colors);
+            }, i * 50); // Stagger creation
+        }
+        
+        // Remove confetti container after animation (match celebration duration)
+        const confettiDuration = category === 'rare' || category === 'ultra_rare' ? 6000 : 5000;
+        setTimeout(() => {
+            if (confettiContainer.parentNode) {
+                confettiContainer.parentNode.removeChild(confettiContainer);
+                console.log('🧹 Confetti cleaned up');
+            }
+        }, confettiDuration);
+    }
+    
+    createConfettiPiece(container, colors) {
+        const confetti = document.createElement('div');
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const size = Math.random() * 8 + 4; // 4-12px
+        const startX = Math.random() * window.innerWidth;
+        const endX = startX + (Math.random() - 0.5) * 200; // Drift sideways
+        const duration = Math.random() * 3000 + 3000; // 3-6 seconds (longer fall)
+        const delay = Math.random() * 1000; // 0-1000ms delay (more staggered)
+        
+        confetti.style.cssText = `
+            position: absolute;
+            width: ${size}px;
+            height: ${size}px;
+            background: ${color};
+            border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+            left: ${startX}px;
+            top: -20px;
+            transform: rotate(${Math.random() * 360}deg);
+            animation: confettiFall ${duration}ms linear ${delay}ms forwards;
+        `;
+        
+        // Add CSS animation if not already added
+        if (!document.getElementById('confetti-styles')) {
+            const style = document.createElement('style');
+            style.id = 'confetti-styles';
+            style.textContent = `
+                @keyframes confettiFall {
+                    0% {
+                        transform: translateY(-20px) rotate(0deg);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: translateY(${window.innerHeight + 20}px) translateX(${endX - startX}px) rotate(720deg);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        container.appendChild(confetti);
+    }
+    
+    addModalCelebrationEffects(category) {
+        if (!this.modalOverlay) return;
+        
+        // Add celebration class to modal
+        const celebrationClass = category === 'rare' || category === 'ultra_rare' ? 'rare-celebration' : 'common-celebration';
+        this.modalOverlay.classList.add('celebrating', celebrationClass);
+        
+        // Add enhanced pulsing effect to prize emoji
+        const prizeEmoji = document.getElementById('prizeEmoji');
+        if (prizeEmoji) {
+            const pulseCount = category === 'rare' || category === 'ultra_rare' ? 8 : 6;
+            prizeEmoji.style.animation = `celebrationPulse 0.8s ease-in-out ${pulseCount}`;
+        }
+        
+        // Add celebration styles if not already added
+        if (!document.getElementById('celebration-styles')) {
+            const style = document.createElement('style');
+            style.id = 'celebration-styles';
+            style.textContent = `
+                @keyframes celebrationPulse {
+                    0%, 100% { transform: scale(1); filter: brightness(1); }
+                    25% { transform: scale(1.08); filter: brightness(1.2); }
+                    50% { transform: scale(1.15); filter: brightness(1.4); }
+                    75% { transform: scale(1.08); filter: brightness(1.2); }
+                }
+                
+                /* Prevent emoji overflow and scrollbars */
+                .modal-overlay .modal-content,
+                .modal-overlay .modal {
+                    overflow: hidden !important;
+                    box-sizing: border-box;
+                }
+                
+                .modal-overlay .prize-emoji {
+                    display: inline-block;
+                    transform-origin: center center;
+                    will-change: transform, filter;
+                    margin: 0.5rem 0 !important;
+                    line-height: 1 !important;
+                }
+                
+                /* Ensure modal has enough padding to accommodate scaling */
+                .modal-overlay.celebrating .modal {
+                    padding: 2.5rem 2rem !important;
+                }
+                
+                .modal-overlay.celebrating .modal-content {
+                    padding: 1.5rem !important;
+                }
+                
+                .modal-overlay.celebrating {
+                    animation: modalCelebration 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                
+                .modal-overlay.rare-celebration .modal-content {
+                    box-shadow: 
+                        0 0 30px rgba(255, 215, 0, 0.8), 
+                        0 0 60px rgba(255, 215, 0, 0.6),
+                        0 0 90px rgba(255, 215, 0, 0.4);
+                    border: 3px solid #FFD700;
+                    animation: rareCelebrationGlow 2s ease-in-out infinite alternate;
+                }
+                
+                .modal-overlay.common-celebration .modal-content {
+                    box-shadow: 
+                        0 0 20px rgba(76, 175, 80, 0.7),
+                        0 0 40px rgba(76, 175, 80, 0.5);
+                    border: 2px solid #4CAF50;
+                    animation: commonCelebrationGlow 2s ease-in-out infinite alternate;
+                }
+                
+                @keyframes modalCelebration {
+                    0% { 
+                        transform: scale(0.8) rotate(-3deg); 
+                        opacity: 0; 
+                        filter: blur(2px);
+                    }
+                    30% { 
+                        transform: scale(1.05) rotate(1deg); 
+                        opacity: 0.8; 
+                        filter: blur(1px);
+                    }
+                    60% { 
+                        transform: scale(0.98) rotate(-0.5deg); 
+                        opacity: 1; 
+                        filter: blur(0px);
+                    }
+                    100% { 
+                        transform: scale(1) rotate(0deg); 
+                        opacity: 1; 
+                        filter: blur(0px);
+                    }
+                }
+                
+                @keyframes rareCelebrationGlow {
+                    0% { 
+                        box-shadow: 
+                            0 0 30px rgba(255, 215, 0, 0.8), 
+                            0 0 60px rgba(255, 215, 0, 0.6),
+                            0 0 90px rgba(255, 215, 0, 0.4);
+                    }
+                    100% { 
+                        box-shadow: 
+                            0 0 40px rgba(255, 215, 0, 1), 
+                            0 0 80px rgba(255, 215, 0, 0.8),
+                            0 0 120px rgba(255, 215, 0, 0.6);
+                    }
+                }
+                
+                @keyframes commonCelebrationGlow {
+                    0% { 
+                        box-shadow: 
+                            0 0 20px rgba(76, 175, 80, 0.7),
+                            0 0 40px rgba(76, 175, 80, 0.5);
+                    }
+                    100% { 
+                        box-shadow: 
+                            0 0 30px rgba(76, 175, 80, 0.9),
+                            0 0 60px rgba(76, 175, 80, 0.7);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Remove celebration effects after animation (match sound duration)
+        const cleanupDelay = category === 'rare' || category === 'ultra_rare' ? 6000 : 5000;
+        setTimeout(() => {
+            this.modalOverlay.classList.remove('celebrating', 'rare-celebration', 'common-celebration');
+            if (prizeEmoji) {
+                prizeEmoji.style.animation = '';
+            }
+        }, cleanupDelay);
+        
+        console.log('✨ Modal celebration effects added for:', category);
+    }
 
     closeModal() {
         if (this.modalOverlay) {
-            this.modalOverlay.classList.remove('show');
+            this.modalOverlay.classList.remove('show', 'celebrating', 'rare-celebration', 'common-celebration');
         }
     }
 
@@ -1802,6 +2276,181 @@ class PickerWheelUI {
             localStorage.setItem('picker_wheel_user_id', userId);
         }
         return userId;
+    }
+    
+    // 📋 DAILY PRIZES LOG SYSTEM
+    initializeDailyPrizesLog() {
+        console.log('📋 Initializing daily prizes log...');
+        
+        // Get DOM elements
+        this.refreshLogBtn = document.getElementById('refreshLogBtn');
+        this.clearLogBtn = document.getElementById('clearLogBtn');
+        this.dailyPrizesTableBody = document.getElementById('dailyPrizesTableBody');
+        this.totalPrizesCount = document.getElementById('totalPrizesCount');
+        this.lastUpdated = document.getElementById('lastUpdated');
+        
+        // Add event listeners
+        if (this.refreshLogBtn) {
+            this.refreshLogBtn.addEventListener('click', () => this.refreshDailyPrizesLog());
+        }
+        
+        if (this.clearLogBtn) {
+            this.clearLogBtn.addEventListener('click', () => this.clearLogDisplay());
+        }
+        
+        // Load initial data
+        this.refreshDailyPrizesLog();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            if (!this.logDisplayHidden) {
+                this.refreshDailyPrizesLog();
+            }
+        }, 30000);
+        
+        console.log('✅ Daily prizes log initialized');
+    }
+    
+    async refreshDailyPrizesLog() {
+        try {
+            console.log('🔄 Refreshing daily prizes log...');
+            
+            const response = await fetch('/api/daily-prizes-log');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.dailyPrizesLog = data.prizes_won;
+                this.updateDailyPrizesDisplay();
+                this.updateLogStats(data.total_count);
+                console.log(`✅ Loaded ${data.total_count} prize entries`);
+            } else {
+                console.warn('⚠️ Failed to load daily prizes log:', data.error);
+            }
+        } catch (error) {
+            console.error('❌ Error refreshing daily prizes log:', error);
+        }
+    }
+    
+    updateDailyPrizesDisplay() {
+        if (!this.dailyPrizesTableBody) return;
+        
+        // Clear existing rows
+        this.dailyPrizesTableBody.innerHTML = '';
+        
+        if (this.dailyPrizesLog.length === 0) {
+            // Show no data message
+            const noDataRow = document.createElement('tr');
+            noDataRow.className = 'no-data-row';
+            noDataRow.innerHTML = `
+                <td colspan="4">No prizes won today yet. Spin the wheel to get started! 🎯</td>
+            `;
+            this.dailyPrizesTableBody.appendChild(noDataRow);
+            return;
+        }
+        
+        // Add prize rows
+        this.dailyPrizesLog.forEach(prize => {
+            const row = document.createElement('tr');
+            // Get display for this prize (prefer combo emojis for combo items)
+            const comboEmoji = this.getComboEmojiDisplay(prize.name);
+            let displayIcon = '';
+            
+            if (comboEmoji) {
+                // Use combo emoji for combo items
+                displayIcon = `<span class="prize-emoji" style="font-size: 0.9rem;">${comboEmoji}</span>`;
+            } else {
+                // Use regular emoji
+                displayIcon = `<span class="prize-emoji">${prize.emoji}</span>`;
+            }
+            
+            row.innerHTML = `
+                <td>
+                    <div class="prize-cell">
+                        ${displayIcon}
+                        <span class="prize-name">${prize.name}</span>
+                    </div>
+                </td>
+                <td class="time-cell">${prize.formatted_time}</td>
+                <td class="user-cell">${prize.user_identifier}</td>
+                <td>
+                    <span class="category-badge ${prize.category}">${prize.category.replace('_', ' ')}</span>
+                </td>
+            `;
+            this.dailyPrizesTableBody.appendChild(row);
+        });
+    }
+    
+    updateLogStats(totalCount) {
+        if (this.totalPrizesCount) {
+            this.totalPrizesCount.textContent = totalCount;
+        }
+        
+        if (this.lastUpdated) {
+            const now = new Date();
+            this.lastUpdated.textContent = now.toLocaleTimeString();
+        }
+    }
+    
+    clearLogDisplay() {
+        console.log('🗑️ Clearing log display (UI only)...');
+        
+        // Clear the display but keep the actual data
+        this.logDisplayHidden = true;
+        
+        if (this.dailyPrizesTableBody) {
+            this.dailyPrizesTableBody.innerHTML = `
+                <tr class="no-data-row">
+                    <td colspan="4">Log display cleared. Click "Refresh" to reload data. 🔄</td>
+                </tr>
+            `;
+        }
+        
+        if (this.totalPrizesCount) {
+            this.totalPrizesCount.textContent = '0 (hidden)';
+        }
+        
+        if (this.lastUpdated) {
+            this.lastUpdated.textContent = 'Display cleared';
+        }
+        
+        // Show refresh button prominently
+        if (this.refreshLogBtn) {
+            this.refreshLogBtn.style.background = 'rgba(76, 175, 80, 0.3)';
+            this.refreshLogBtn.style.border = '2px solid #4CAF50';
+            
+            // Reset button style after 3 seconds
+            setTimeout(() => {
+                this.refreshLogBtn.style.background = '';
+                this.refreshLogBtn.style.border = '';
+            }, 3000);
+        }
+        
+        // Re-enable auto-refresh on next refresh click
+        this.logDisplayHidden = false;
+    }
+    
+    // Add prize to log when won (called after successful spin)
+    addPrizeToLog(prize) {
+        const now = new Date();
+        const logEntry = {
+            prize_id: prize.id,
+            name: prize.name,
+            user_identifier: 'You',
+            formatted_time: now.toLocaleTimeString(),
+            category: prize.category,
+            emoji: prize.emoji
+        };
+        
+        // Add to beginning of array (most recent first)
+        this.dailyPrizesLog.unshift(logEntry);
+        
+        // Update display if not hidden
+        if (!this.logDisplayHidden) {
+            this.updateDailyPrizesDisplay();
+            this.updateLogStats(this.dailyPrizesLog.length);
+        }
+        
+        console.log('📋 Added prize to log:', prize.name);
     }
 }
 
