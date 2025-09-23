@@ -1,10 +1,10 @@
-Item,Category,Quantity,Daily Limit,Available Dates
-smartwatch + mini cooler,Common,100,100,2025-10-16
-power bank + neckband,Common,100,100,2025-10-16
-luggage bags,Common,100,100,2025-10-16
-Free pouch and screen guard,Common,10,5,2025-10-16
-Dinner Set,Common,20,5,2025-10-16
-Earbuds and G.Speaker,Common,10,3,2025-10-16
-intex home theatre,Rare,4,1,2025-10-16
-zebronics astra BT speaker,Rare,9,1,2025-10-16
-pressure cooker,Common,5,1,2025-10-16
+Item,Category,Quantity,Daily Limit,Emoji
+smartwatch + mini cooler,common,30,5,⌚
+power bank + neckband,common,30,5,🔋
+luggage bags,common,30,5,🧳
+Free pouch and screen guard,common,30,5,📱
+Dinner Set,common,30,5,🍽️
+Earbuds and G.Speaker,common,30,5,🎧
+intex home theatre,rare,4,1,🎵
+zebronics astra BT speaker,rare,9,1,🔊
+pressure cooker,rare,5,1,🍲

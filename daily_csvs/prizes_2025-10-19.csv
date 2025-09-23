@@ -1,13 +1,13 @@
-Item,Category,Quantity,Daily Limit,Available Dates
-smartwatch + mini cooler,Common,100,100,2025-10-19
-power bank + neckband,Common,100,100,2025-10-19
-luggage bags,Common,100,100,2025-10-19
-Free pouch and screen guard,Common,10,5,2025-10-19
-Dinner Set,Common,20,5,2025-10-19
-Earbuds and G.Speaker,Common,10,3,2025-10-19
-jio tab,Rare,2,1,2025-10-19
-intex home theatre,Rare,4,1,2025-10-19
-zebronics home theatre,Rare,6,1,2025-10-19
-zebronics astra BT speaker,Rare,9,1,2025-10-19
-boult 60w soundbar,Rare,6,1,2025-10-19
-pressure cooker,Common,5,1,2025-10-19
+Item,Category,Quantity,Daily Limit,Emoji
+smartwatch + mini cooler,common,30,5,⌚
+power bank + neckband,common,30,5,🔋
+luggage bags,common,30,5,🧳
+Free pouch and screen guard,common,30,5,📱
+Dinner Set,common,30,5,🍽️
+Earbuds and G.Speaker,common,30,5,🎧
+jio tab,rare,2,1,📱
+intex home theatre,rare,4,1,🎵
+zebronics home theatre,rare,6,1,🎵
+zebronics astra BT speaker,rare,9,1,🔊
+boult 60w soundbar,rare,6,1,🔊
+pressure cooker,rare,5,1,🍲

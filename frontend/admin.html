@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - PickerWheel Contest</title>
+    <title>Daily PickerWheel Admin Panel</title>
     
     <style>
         * {
@@ -17,11 +17,11 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: #ffffff;
             min-height: 100vh;
-            padding: 2rem;
+            padding: 1rem;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -51,57 +51,8 @@
             padding: 2rem;
             margin-bottom: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 0.8rem;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #ffffff;
-            font-size: 1rem;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #00d4ff, #0099cc);
-            color: white;
-            border: none;
-            padding: 0.8rem 2rem;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-        }
-
-        .btn-danger:hover {
-            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+            max-width: 400px;
+            margin: 0 auto 2rem auto;
         }
 
         .admin-panel {
@@ -110,34 +61,6 @@
 
         .admin-panel.show {
             display: block;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: #00d4ff;
-            display: block;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            color: #b8c6db;
-            font-size: 1rem;
         }
 
         .section {
@@ -152,28 +75,138 @@
             margin-bottom: 1.5rem;
             color: #00d4ff;
             font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .inventory-table {
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #b8c6db;
+        }
+
+        .form-group input, .form-group select {
             width: 100%;
-            border-collapse: collapse;
+            padding: 0.8rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.25rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #feca57, #ff9ff3);
+        }
+
+        .btn-warning:hover {
+            box-shadow: 0 5px 15px rgba(254, 202, 87, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
             margin-top: 1rem;
         }
 
-        .inventory-table th,
-        .inventory-table td {
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #00d4ff;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #b8c6db;
+            font-size: 0.9rem;
+        }
+
+        .limits-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .limits-table th,
+        .limits-table td {
             padding: 0.8rem;
             text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .inventory-table th {
+        .limits-table th {
             background: rgba(255, 255, 255, 0.1);
             font-weight: 600;
             color: #00d4ff;
         }
 
-        .inventory-table tr:hover {
+        .limits-table tr:hover {
             background: rgba(255, 255, 255, 0.05);
         }
 
@@ -182,63 +215,137 @@
             font-weight: 600;
         }
 
-        .status-limited {
+        .status-exhausted {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .status-out-of-stock {
             color: #feca57;
             font-weight: 600;
         }
 
-        .status-unavailable {
-            color: #ff6b6b;
-            font-weight: 600;
-        }
-
-        .error-message {
-            background: rgba(255, 107, 107, 0.2);
-            border: 2px solid #ff6b6b;
-            border-radius: 10px;
+        .message {
             padding: 1rem;
+            border-radius: 8px;
             margin: 1rem 0;
-            color: #ff6b6b;
             font-weight: 600;
         }
 
-        .success-message {
+        .message.success {
             background: rgba(78, 205, 196, 0.2);
             border: 2px solid #4ecdc4;
-            border-radius: 10px;
+            color: #4ecdc4;
+        }
+
+        .message.error {
+            background: rgba(255, 107, 107, 0.2);
+            border: 2px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .message.warning {
+            background: rgba(254, 202, 87, 0.2);
+            border: 2px solid #feca57;
+            color: #feca57;
+        }
+
+        .output-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
             padding: 1rem;
             margin: 1rem 0;
-            color: #4ecdc4;
-            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
         }
 
-        .replenish-form {
-            display: flex;
-            gap: 1rem;
-            align-items: end;
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00d4ff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .editable-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
         }
 
-        .replenish-form .form-group {
-            margin-bottom: 0;
+        .editable-table th,
+        .editable-table td {
+            padding: 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .replenish-form input {
-            min-width: 150px;
+        .editable-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: 600;
+            color: #00d4ff;
         }
+
+        .editable-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .editable-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 0.4rem;
+            color: #ffffff;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .editable-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 5px rgba(0, 212, 255, 0.3);
+        }
+
+        .editable-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 0.4rem;
+            color: #ffffff;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .btn-small {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            margin: 0.1rem;
+        }
+
+        .category-common { color: #4ecdc4; }
+        .category-rare { color: #feca57; }
+        .category-ultra_rare { color: #ff6b6b; }
 
         @media (max-width: 768px) {
-            .replenish-form {
+            .btn-group {
                 flex-direction: column;
-                align-items: stretch;
             }
             
             .stats-grid {
                 grid-template-columns: 1fr;
-            }
-            
-            .inventory-table {
-                font-size: 0.9rem;
             }
         }
     </style>
@@ -246,83 +353,126 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">Admin Panel</h1>
-            <p class="subtitle">PickerWheel Contest Management</p>
+            <h1 class="title">Daily PickerWheel Admin</h1>
+            <p class="subtitle">Manage Daily CSV System & Aggressive Selection</p>
         </div>
 
         <!-- Login Section -->
         <div class="login-section" id="loginSection">
-            <h3>Admin Authentication</h3>
+            <h3>🔐 Admin Authentication</h3>
             <div class="form-group">
                 <label for="adminPassword">Admin Password:</label>
-                <input type="password" id="adminPassword" placeholder="Enter admin password">
+                <input type="password" id="adminPassword" placeholder="Enter admin password" onkeypress="handleLoginKeyPress(event)">
             </div>
             <button class="btn" onclick="login()">Login</button>
-            <div id="loginError"></div>
+            <div id="loginMessage"></div>
         </div>
 
         <!-- Admin Panel -->
         <div class="admin-panel" id="adminPanel">
-            <!-- Stats Section -->
+            <!-- Quick Actions -->
             <div class="section">
-                <h3>Contest Statistics</h3>
+                <h3>🚀 Quick Actions</h3>
+                <div class="form-group">
+                    <label for="currentDate">Working Date:</label>
+                    <input type="date" id="currentDate" onchange="refreshData()">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="refreshData()">🔄 Refresh Data</button>
+                    <button class="btn btn-warning" onclick="resetDatabase()">🗑️ Reset Database</button>
+                    <button class="btn" onclick="regenerateCSVs()">📊 Regenerate CSVs</button>
+                    <button class="btn" onclick="loadDailyCSV()">📋 Load Daily CSV</button>
+                    <button class="btn" onclick="validateItemlist()">✅ Validate Format</button>
+                    <button class="btn" onclick="testSelection()">🎯 Test Selection</button>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="section">
+                <h3>📊 System Status</h3>
                 <div class="stats-grid" id="statsGrid">
                     <!-- Stats will be loaded here -->
                 </div>
-                <button class="btn" onclick="refreshStats()">Refresh Stats</button>
             </div>
 
-            <!-- Inventory Management -->
+            <!-- Daily Limits Status -->
             <div class="section">
-                <h3>Prize Inventory Management</h3>
-                <div class="form-group">
-                    <label for="inventoryDate">Select Date:</label>
-                    <input type="date" id="inventoryDate" onchange="loadInventory()">
+                <h3>⚡ Daily Limits Status</h3>
+                <div id="limitsContainer">
+                    <!-- Limits table will be loaded here -->
+                </div>
+                <button class="btn" onclick="loadDailyLimits()">🔍 Check Limits</button>
+            </div>
+
+            <!-- Live Database Editor -->
+            <div class="section">
+                <h3>🔧 Live Database Editor</h3>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="loadPrizes()">📋 Load Prizes</button>
+                    <button class="btn" onclick="showAddPrizeForm()">➕ Add Prize</button>
+                    <button class="btn btn-warning" onclick="exportToCSV()">📤 Export to CSV</button>
                 </div>
                 
-                <table class="inventory-table" id="inventoryTable">
-                    <thead>
-                        <tr>
-                            <th>Prize Name</th>
-                            <th>Category</th>
-                            <th>Type</th>
-                            <th>Initial Qty</th>
-                            <th>Remaining</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inventoryBody">
-                        <!-- Inventory will be loaded here -->
-                    </tbody>
-                </table>
-
-                <!-- Replenish Form -->
-                <div class="replenish-form">
-                    <div class="form-group">
-                        <label for="replenishPrize">Prize ID:</label>
-                        <input type="number" id="replenishPrize" placeholder="Prize ID">
+                <!-- Add Prize Form (Hidden by default) -->
+                <div id="addPrizeForm" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <h4>➕ Add New Prize</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
+                        <div class="form-group">
+                            <label>Prize Name:</label>
+                            <input type="text" id="newPrizeName" placeholder="Enter prize name">
+                        </div>
+                        <div class="form-group">
+                            <label>Category:</label>
+                            <select id="newPrizeCategory">
+                                <option value="common">Common</option>
+                                <option value="rare">Rare</option>
+                                <option value="ultra_rare">Ultra Rare</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity:</label>
+                            <input type="number" id="newPrizeQuantity" value="30" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Daily Limit:</label>
+                            <input type="number" id="newPrizeDailyLimit" value="5" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Emoji:</label>
+                            <input type="text" id="newPrizeEmoji" value="🎁" maxlength="2">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="replenishQuantity">Quantity:</label>
-                        <input type="number" id="replenishQuantity" placeholder="Quantity" value="1" min="1">
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="addPrize()">✅ Add Prize</button>
+                        <button class="btn btn-danger" onclick="hideAddPrizeForm()">❌ Cancel</button>
                     </div>
-                    <div class="form-group">
-                        <label for="replenishDate">Date:</label>
-                        <input type="date" id="replenishDate">
-                    </div>
-                    <button class="btn" onclick="replenishInventory()">Replenish</button>
+                </div>
+                
+                <!-- Prizes Table -->
+                <div id="prizesContainer" style="margin-top: 1rem;">
+                    <p>Click "Load Prizes" to view and edit current prizes for the selected date.</p>
                 </div>
             </div>
 
-            <!-- Actions -->
+            <!-- Test Results -->
             <div class="section">
-                <h3>Admin Actions</h3>
-                <button class="btn" onclick="refreshAllData()">Refresh All Data</button>
-                <button class="btn" onclick="window.location.href='db-manager.html'">Database Manager</button>
-                <button class="btn btn-success" onclick="verifySystem()">Verify System</button>
-                <button class="btn btn-warning" onclick="clearCache()">Clear Cache</button>
-                <button class="btn btn-danger" onclick="logout()">Logout</button>
+                <h3>🧪 Test Results</h3>
+                <div id="testResults">
+                    <p>Click "Test Selection" to run aggressive selection tests.</p>
+                </div>
+            </div>
+
+            <!-- System Output -->
+            <div class="section">
+                <h3>📝 System Output</h3>
+                <div id="systemOutput" class="output-box">
+                    Ready for admin operations...
+                </div>
+            </div>
+
+            <!-- Logout -->
+            <div class="section">
+                <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
             </div>
         </div>
     </div>
@@ -334,40 +484,47 @@
         // Set today's date as default
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('inventoryDate').value = today;
-            document.getElementById('replenishDate').value = today;
+            document.getElementById('currentDate').value = today;
+            
+            // Focus on password field for better UX
+            document.getElementById('adminPassword').focus();
         });
+
+        function handleLoginKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                login();
+            }
+        }
 
         async function login() {
             const password = document.getElementById('adminPassword').value;
-            const errorDiv = document.getElementById('loginError');
+            const messageDiv = document.getElementById('loginMessage');
             
             if (!password) {
-                showError('Please enter password', errorDiv);
+                showMessage('Please enter password', 'error', messageDiv);
                 return;
             }
 
             try {
-                // Test authentication with inventory endpoint
-                const response = await fetch(`${API_BASE}/admin/inventory`, {
-                    headers: {
-                        'Authorization': `Bearer ${password}`
-                    }
-                });
-
+                // Test authentication with daily limits endpoint
+                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${password}&date=${getCurrentDate()}`);
+                
                 if (response.ok) {
                     authToken = password;
                     document.getElementById('loginSection').style.display = 'none';
                     document.getElementById('adminPanel').classList.add('show');
                     
+                    showMessage('✅ Login successful!', 'success', messageDiv);
+                    addToOutput('🔐 Admin logged in successfully');
+                    
                     // Load initial data
-                    await refreshAllData();
-                    showSuccess('Login successful!', errorDiv);
+                    await refreshData();
                 } else {
-                    showError('Invalid password', errorDiv);
+                    showMessage('❌ Invalid password', 'error', messageDiv);
                 }
             } catch (error) {
-                showError('Login failed: ' + error.message, errorDiv);
+                showMessage('❌ Login failed: ' + error.message, 'error', messageDiv);
             }
         }
 
@@ -375,306 +532,143 @@
             authToken = null;
             document.getElementById('adminPanel').style.display = 'none';
             document.getElementById('loginSection').style.display = 'block';
-            showMessage('Logged out successfully', 'success');
+            document.getElementById('adminPassword').value = '';
+            addToOutput('🚪 Admin logged out');
         }
-        
-        function clearCache() {
+
+        function getCurrentDate() {
+            return document.getElementById('currentDate').value;
+        }
+
+        async function refreshData() {
+            if (!authToken) return;
+            
+            addToOutput('🔄 Refreshing system data...');
+            
             try {
-                // Clear localStorage items
-                const keysToRemove = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && (key.includes('wheel') || key.includes('prize') || 
-                               key.includes('spin') || key.includes('inventory') || 
-                               key.includes('stats'))) {
-                        keysToRemove.push(key);
-                    }
-                }
-                
-                keysToRemove.forEach(key => {
-                    localStorage.removeItem(key);
-                });
-                
-                // Clear sessionStorage
-                sessionStorage.clear();
-                
-                // Update version to force refresh on next load
-                localStorage.setItem('wheel_version', '11.4_20250922');
-                
-                // Show success message
-                showMessage('Cache cleared successfully!', 'success');
-                
-                // Refresh data
-                refreshAllData();
+                await Promise.all([
+                    loadSystemStats(),
+                    loadDailyLimits()
+                ]);
+                addToOutput('✅ Data refreshed successfully');
             } catch (error) {
-                console.error('Cache clearing error:', error);
-                showMessage('Error clearing cache: ' + error.message, 'error');
+                addToOutput('❌ Error refreshing data: ' + error.message);
             }
         }
 
-        async function refreshStats() {
+        async function loadSystemStats() {
             try {
-                const response = await fetch(`${API_BASE}/stats`);
+                const date = getCurrentDate();
+                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}`);
                 const data = await response.json();
                 
                 if (data.success) {
-                    updateStatsDisplay(data.stats);
-                } else {
-                    throw new Error(data.error);
+                    const summary = data.summary;
+                    document.getElementById('statsGrid').innerHTML = `
+                        <div class="stat-card">
+                            <span class="stat-value">${summary.total_items}</span>
+                            <span class="stat-label">Total Items</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">${summary.available}</span>
+                            <span class="stat-label">Available</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">${summary.exhausted}</span>
+                            <span class="stat-label">Exhausted</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">${summary.out_of_stock}</span>
+                            <span class="stat-label">Out of Stock</span>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                console.error('Failed to load stats:', error);
+                addToOutput('❌ Error loading stats: ' + error.message);
             }
         }
 
-        function updateStatsDisplay(stats) {
-            const statsGrid = document.getElementById('statsGrid');
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <span class="stat-value">${stats.total_wins || 0}</span>
-                    <span class="stat-label">Total Wins Today</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${stats.unique_users || 0}</span>
-                    <span class="stat-label">Unique Participants</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${stats.inventory_status ? stats.inventory_status.length : 0}</span>
-                    <span class="stat-label">Available Prizes</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">${stats.prize_breakdown ? stats.prize_breakdown.length : 0}</span>
-                    <span class="stat-label">Prize Types Won</span>
-                </div>
-            `;
-        }
-
-        async function loadInventory() {
-            if (!authToken) return;
-
-            const date = document.getElementById('inventoryDate').value;
-            if (!date) return;
-
+        async function loadDailyLimits() {
             try {
-                const response = await fetch(`${API_BASE}/admin/inventory?date=${date}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
+                const date = getCurrentDate();
+                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}`);
                 const data = await response.json();
                 
                 if (data.success) {
-                    updateInventoryDisplay(data.inventory);
-                } else {
-                    throw new Error(data.error);
+                    const limitsHtml = `
+                        <table class="limits-table">
+                            <thead>
+                                <tr>
+                                    <th>Prize Name</th>
+                                    <th>Category</th>
+                                    <th>Wins Today</th>
+                                    <th>Daily Limit</th>
+                                    <th>Remaining</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.limits_status.map(item => `
+                                    <tr>
+                                        <td>${item.name}</td>
+                                        <td>${item.category}</td>
+                                        <td>${item.wins_today}</td>
+                                        <td>${item.daily_limit}</td>
+                                        <td>${item.remaining_quantity}</td>
+                                        <td><span class="status-${item.status.toLowerCase().replace('_', '-')}">${item.status}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    document.getElementById('limitsContainer').innerHTML = limitsHtml;
                 }
             } catch (error) {
-                console.error('Failed to load inventory:', error);
-                showError('Failed to load inventory: ' + error.message);
+                addToOutput('❌ Error loading daily limits: ' + error.message);
             }
         }
 
-        function updateInventoryDisplay(inventory) {
-            const tbody = document.getElementById('inventoryBody');
-            tbody.innerHTML = '';
-
-            inventory.forEach(item => {
-                const row = document.createElement('tr');
-                
-                let status = 'unavailable';
-                let statusText = 'Unavailable';
-                let statusClass = 'status-unavailable';
-                
-                if (item.is_unlimited) {
-                    status = 'unlimited';
-                    statusText = 'Unlimited';
-                    statusClass = 'status-available';
-                } else if (item.remaining_quantity > 5) {
-                    status = 'available';
-                    statusText = 'Available';
-                    statusClass = 'status-available';
-                } else if (item.remaining_quantity > 0) {
-                    status = 'limited';
-                    statusText = 'Limited';
-                    statusClass = 'status-limited';
-                }
-
-                row.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>${item.category}</td>
-                    <td>${item.type}</td>
-                    <td>${item.initial_quantity}</td>
-                    <td>${item.is_unlimited ? '∞' : item.remaining_quantity}</td>
-                    <td><span class="${statusClass}">${statusText}</span></td>
-                    <td>
-                        <button class="btn" onclick="setReplenishPrize(${item.id})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
-                            Replenish
-                        </button>
-                    </td>
-                `;
-                
-                tbody.appendChild(row);
-            });
-        }
-
-        function setReplenishPrize(prizeId) {
-            document.getElementById('replenishPrize').value = prizeId;
-        }
-
-        async function replenishInventory() {
+        async function resetDatabase() {
             if (!authToken) return;
-
-            const prizeId = document.getElementById('replenishPrize').value;
-            const quantity = document.getElementById('replenishQuantity').value;
-            const date = document.getElementById('replenishDate').value;
-
-            if (!prizeId || !quantity || !date) {
-                showError('Please fill all replenish fields');
+            
+            if (!confirm('⚠️ Are you sure you want to reset the database? This will clear all transactions and inventory data!')) {
                 return;
             }
-
+            
+            addToOutput('🗑️ Resetting database...');
+            
             try {
-                const response = await fetch(`${API_BASE}/admin/replenish`, {
+                const response = await fetch(`${API_BASE}/admin/reset-database`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        prize_id: parseInt(prizeId),
-                        quantity: parseInt(quantity),
-                        date: date
+                        admin_password: authToken,
+                        confirm: true
                     })
                 });
-
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    showSuccess('Inventory replenished successfully!');
-                    await loadInventory(); // Refresh inventory display
-                    
-                    // Clear form
-                    document.getElementById('replenishPrize').value = '';
-                    document.getElementById('replenishQuantity').value = '1';
+                    addToOutput('✅ Database reset successfully');
+                    await refreshData();
                 } else {
-                    throw new Error(data.error);
+                    addToOutput('❌ Database reset failed: ' + data.error);
                 }
             } catch (error) {
-                showError('Failed to replenish inventory: ' + error.message);
+                addToOutput('❌ Error resetting database: ' + error.message);
             }
         }
 
-        async function refreshAllData() {
-            await refreshStats();
-            await loadInventory();
-        }
-        
-        async function verifySystem() {
+        async function regenerateCSVs() {
             if (!authToken) return;
             
-            try {
-                // Create a modal for verification results
-                const modal = document.createElement('div');
-                modal.style.position = 'fixed';
-                modal.style.top = '50%';
-                modal.style.left = '50%';
-                modal.style.transform = 'translate(-50%, -50%)';
-                modal.style.background = 'rgba(0, 0, 0, 0.9)';
-                modal.style.padding = '2rem';
-                modal.style.borderRadius = '15px';
-                modal.style.boxShadow = '0 0 20px rgba(0, 212, 255, 0.5)';
-                modal.style.zIndex = '1000';
-                modal.style.width = '80%';
-                modal.style.maxWidth = '800px';
-                modal.style.maxHeight = '80vh';
-                modal.style.overflow = 'auto';
-                
-                // Add title
-                const title = document.createElement('h3');
-                title.textContent = 'System Verification';
-                title.style.color = '#00d4ff';
-                title.style.marginBottom = '1rem';
-                modal.appendChild(title);
-                
-                // Add loading message
-                const loadingMsg = document.createElement('div');
-                loadingMsg.textContent = 'Running system verification...';
-                loadingMsg.style.color = '#ffffff';
-                loadingMsg.style.marginBottom = '1rem';
-                modal.appendChild(loadingMsg);
-                
-                // Add results container
-                const resultsContainer = document.createElement('div');
-                resultsContainer.style.background = 'rgba(0, 0, 0, 0.3)';
-                resultsContainer.style.padding = '1rem';
-                resultsContainer.style.borderRadius = '8px';
-                resultsContainer.style.marginBottom = '1rem';
-                resultsContainer.style.fontFamily = 'monospace';
-                resultsContainer.style.whiteSpace = 'pre-wrap';
-                resultsContainer.style.maxHeight = '50vh';
-                resultsContainer.style.overflow = 'auto';
-                modal.appendChild(resultsContainer);
-                
-                // Add close button
-                const closeButton = document.createElement('button');
-                closeButton.textContent = 'Close';
-                closeButton.className = 'btn btn-danger';
-                closeButton.onclick = () => document.body.removeChild(modal);
-                modal.appendChild(closeButton);
-                
-                // Add modal to body
-                document.body.appendChild(modal);
-                
-                // Run verification tests
-                await runVerificationTests(resultsContainer);
-                
-                // Update loading message
-                loadingMsg.textContent = 'Verification complete!';
-                loadingMsg.style.color = '#4ecdc4';
-                
-            } catch (error) {
-                console.error('Verification error:', error);
-                showError('Verification failed: ' + error.message);
-            }
-        }
-        
-        async function runVerificationTests(resultsContainer) {
-            // Helper function to add a test result
-            function addResult(name, status, message = '') {
-                const resultDiv = document.createElement('div');
-                resultDiv.style.marginBottom = '0.5rem';
-                resultDiv.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
-                resultDiv.style.paddingBottom = '0.5rem';
-                
-                const statusSpan = document.createElement('span');
-                statusSpan.textContent = status ? '✅ ' : '❌ ';
-                statusSpan.style.color = status ? '#4ecdc4' : '#ff6b6b';
-                statusSpan.style.fontWeight = 'bold';
-                resultDiv.appendChild(statusSpan);
-                
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = name;
-                nameSpan.style.color = '#ffffff';
-                nameSpan.style.fontWeight = 'bold';
-                resultDiv.appendChild(nameSpan);
-                
-                if (message) {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.textContent = message;
-                    messageDiv.style.color = 'rgba(255, 255, 255, 0.7)';
-                    messageDiv.style.marginLeft = '1.5rem';
-                    messageDiv.style.fontSize = '0.9rem';
-                    resultDiv.appendChild(messageDiv);
-                }
-                
-                resultsContainer.appendChild(resultDiv);
-                return status;
-            }
+            addToOutput('📊 Regenerating daily CSV files...');
             
-            // Test 1: Database Connection
             try {
-                const response = await fetch(`${API_BASE}/admin/check-database`, {
+                const response = await fetch(`${API_BASE}/admin/regenerate-csvs`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -685,216 +679,472 @@
                 });
                 
                 const data = await response.json();
-                const dbStatus = data.success;
-                let dbMessage = '';
                 
-                if (dbStatus && data.results) {
-                    dbMessage = 'Tables found: ' + Object.keys(data.results).join(', ');
+                if (data.success) {
+                    addToOutput('✅ CSV files regenerated successfully');
+                    if (data.output) {
+                        addToOutput('📄 Output:\n' + data.output);
+                    }
+                    await refreshData();
+                } else {
+                    addToOutput('❌ CSV regeneration failed: ' + data.error);
+                    if (data.details) {
+                        addToOutput('📄 Details:\n' + data.details);
+                    }
                 }
-                
-                addResult('Database Connection', dbStatus, dbMessage);
             } catch (error) {
-                addResult('Database Connection', false, error.message);
+                addToOutput('❌ Error regenerating CSVs: ' + error.message);
             }
+        }
+
+        async function testSelection() {
+            if (!authToken) return;
             
-            // Test 2: Prize Availability
-            try {
-                const response = await fetch(`${API_BASE}/prizes/available`);
-                const data = await response.json();
-                
-                const availStatus = data && Array.isArray(data) && data.length > 0;
-                const availMessage = availStatus ? `${data.length} prizes available today` : 'No prizes available';
-                
-                addResult('Prize Availability', availStatus, availMessage);
-            } catch (error) {
-                addResult('Prize Availability', false, error.message);
-            }
+            addToOutput('🎯 Testing aggressive selection logic...');
             
-            // Test 3: CSV Configuration
             try {
-                const response = await fetch(`${API_BASE}/admin/csv/validate`, {
+                const response = await fetch(`${API_BASE}/admin/test-selection`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         admin_password: authToken,
-                        csv_content: ''
+                        date: getCurrentDate(),
+                        num_tests: 10
                     })
                 });
                 
                 const data = await response.json();
-                const csvStatus = data.success;
-                let csvMessage = '';
                 
-                if (csvStatus && data.validation_results) {
-                    csvMessage = `Valid prizes: ${data.validation_results.valid_prizes || 0}`;
-                    if (data.validation_results.warnings && data.validation_results.warnings.length > 0) {
-                        csvMessage += `\nWarnings: ${data.validation_results.warnings.length}`;
-                    }
-                }
-                
-                addResult('CSV Configuration', csvStatus, csvMessage);
-            } catch (error) {
-                addResult('CSV Configuration', false, error.message);
-            }
-            
-            // Test 4: Inventory Status
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`${API_BASE}/admin/inventory?date=${today}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-                
-                const data = await response.json();
-                const invStatus = data.success;
-                let invMessage = '';
-                
-                if (invStatus && data.inventory) {
-                    const categories = {};
-                    data.inventory.forEach(item => {
-                        const category = item.category || 'unknown';
-                        categories[category] = (categories[category] || 0) + 1;
+                if (data.success) {
+                    let resultsHtml = `
+                        <h4>🎯 Selection Test Results (${data.num_tests} tests)</h4>
+                        <div class="stats-grid">
+                    `;
+                    
+                    // Show category distribution
+                    Object.entries(data.category_distribution).forEach(([category, count]) => {
+                        resultsHtml += `
+                            <div class="stat-card">
+                                <span class="stat-value">${count}</span>
+                                <span class="stat-label">${category}</span>
+                            </div>
+                        `;
                     });
                     
-                    invMessage = 'Categories: ' + Object.entries(categories)
-                        .map(([cat, count]) => `${cat} (${count})`)
-                        .join(', ');
+                    resultsHtml += `</div><div class="output-box">`;
+                    
+                    // Show detailed results
+                    data.results.forEach(result => {
+                        if (result.error) {
+                            resultsHtml += `Test ${result.test_number}: ❌ ${result.error}\n`;
+                        } else {
+                            resultsHtml += `Test ${result.test_number}: ${result.prize_name} (${result.category}) - ${result.wins_today}/${result.daily_limit} daily, ${result.remaining_quantity} remaining\n`;
+                        }
+                    });
+                    
+                    resultsHtml += `</div>`;
+                    
+                    document.getElementById('testResults').innerHTML = resultsHtml;
+                    addToOutput('✅ Selection test completed');
+                } else {
+                    addToOutput('❌ Selection test failed: ' + data.error);
                 }
-                
-                addResult('Inventory Status', invStatus, invMessage);
             } catch (error) {
-                addResult('Inventory Status', false, error.message);
+                addToOutput('❌ Error testing selection: ' + error.message);
+            }
+        }
+
+        function showMessage(message, type, container = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(messageDiv);
+            } else {
+                document.body.appendChild(messageDiv);
+                setTimeout(() => messageDiv.remove(), 5000);
+            }
+        }
+
+        function addToOutput(message) {
+            const outputDiv = document.getElementById('systemOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            outputDiv.textContent += `[${timestamp}] ${message}\n`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        // Live Database Editor Functions
+
+        async function loadPrizes() {
+            if (!authToken) return;
+            
+            addToOutput('📋 Loading prizes for editing...');
+            
+            try {
+                const date = getCurrentDate();
+                const response = await fetch(`${API_BASE}/admin/prizes/list?admin_password=${authToken}&date=${date}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayEditablePrizes(data.prizes);
+                    addToOutput(`✅ Loaded ${data.total_count} prizes for ${date}`);
+                } else {
+                    addToOutput('❌ Error loading prizes: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error loading prizes: ' + error.message);
+            }
+        }
+
+        function displayEditablePrizes(prizes) {
+            const container = document.getElementById('prizesContainer');
+            
+            if (prizes.length === 0) {
+                container.innerHTML = '<p>No prizes found for this date. Click "Add Prize" to create new ones.</p>';
+                return;
             }
             
-            // Test 5: Daily Limits
+            let tableHtml = `
+                <table class="editable-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Emoji</th>
+                            <th>Quantity</th>
+                            <th>Daily Limit</th>
+                            <th>Remaining</th>
+                            <th>Wins Today</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            prizes.forEach(prize => {
+                tableHtml += `
+                    <tr id="prize-row-${prize.prize_id}">
+                        <td>${prize.prize_id}</td>
+                        <td>
+                            <input type="text" class="editable-input" value="${prize.name}" 
+                                   onchange="updatePrizeField(${prize.prize_id}, 'name', this.value)">
+                        </td>
+                        <td>
+                            <select class="editable-select" onchange="updatePrizeField(${prize.prize_id}, 'category', this.value)">
+                                <option value="common" ${prize.category === 'common' ? 'selected' : ''}>Common</option>
+                                <option value="rare" ${prize.category === 'rare' ? 'selected' : ''}>Rare</option>
+                                <option value="ultra_rare" ${prize.category === 'ultra_rare' ? 'selected' : ''}>Ultra Rare</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" class="editable-input" value="${prize.emoji || '🎁'}" maxlength="2"
+                                   onchange="updatePrizeField(${prize.prize_id}, 'emoji', this.value)">
+                        </td>
+                        <td>
+                            <input type="number" class="editable-input" value="${prize.quantity}" min="1"
+                                   onchange="updatePrizeField(${prize.prize_id}, 'quantity', this.value)">
+                        </td>
+                        <td>
+                            <input type="number" class="editable-input" value="${prize.daily_limit}" min="1"
+                                   onchange="updatePrizeField(${prize.prize_id}, 'daily_limit', this.value)">
+                        </td>
+                        <td>
+                            <input type="number" class="editable-input" value="${prize.remaining_quantity || 0}" min="0"
+                                   onchange="updatePrizeField(${prize.prize_id}, 'remaining_quantity', this.value)">
+                        </td>
+                        <td><span class="category-${prize.category}">${prize.wins_today || 0}</span></td>
+                        <td>
+                            <button class="btn btn-danger btn-small" onclick="deletePrize(${prize.prize_id}, '${prize.name}')">
+                                🗑️ Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = tableHtml;
+        }
+
+        async function updatePrizeField(prizeId, field, value) {
+            if (!authToken) return;
+            
             try {
-                // Get inventory to check for items with daily limits
-                const today = new Date().toISOString().split('T')[0];
-                const invResponse = await fetch(`${API_BASE}/admin/inventory?date=${today}`, {
+                const response = await fetch(`${API_BASE}/admin/prizes/update`, {
+                    method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        prize_id: prizeId,
+                        date: getCurrentDate(),
+                        updates: {
+                            [field]: field === 'quantity' || field === 'daily_limit' || field === 'remaining_quantity' ? 
+                                     parseInt(value) : value
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ Updated prize ${prizeId}: ${field} = ${value}`);
+                    // Refresh data to show updated stats
+                    await refreshData();
+                } else {
+                    addToOutput(`❌ Error updating prize ${prizeId}: ${data.error}`);
+                    // Reload prizes to revert changes
+                    await loadPrizes();
+                }
+            } catch (error) {
+                addToOutput(`❌ Error updating prize ${prizeId}: ${error.message}`);
+                await loadPrizes();
+            }
+        }
+
+        function showAddPrizeForm() {
+            document.getElementById('addPrizeForm').style.display = 'block';
+            addToOutput('📝 Add prize form opened');
+        }
+
+        function hideAddPrizeForm() {
+            document.getElementById('addPrizeForm').style.display = 'none';
+            // Clear form
+            document.getElementById('newPrizeName').value = '';
+            document.getElementById('newPrizeCategory').value = 'common';
+            document.getElementById('newPrizeQuantity').value = '30';
+            document.getElementById('newPrizeDailyLimit').value = '5';
+            document.getElementById('newPrizeEmoji').value = '🎁';
+            addToOutput('📝 Add prize form closed');
+        }
+
+        async function addPrize() {
+            if (!authToken) return;
+            
+            const name = document.getElementById('newPrizeName').value.trim();
+            const category = document.getElementById('newPrizeCategory').value;
+            const quantity = parseInt(document.getElementById('newPrizeQuantity').value);
+            const dailyLimit = parseInt(document.getElementById('newPrizeDailyLimit').value);
+            const emoji = document.getElementById('newPrizeEmoji').value.trim() || '🎁';
+            
+            if (!name) {
+                addToOutput('❌ Prize name is required');
+                return;
+            }
+            
+            addToOutput(`➕ Adding new prize: ${name}...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/prizes/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        date: getCurrentDate(),
+                        prize: {
+                            name: name,
+                            category: category,
+                            quantity: quantity,
+                            daily_limit: dailyLimit,
+                            emoji: emoji
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ Prize added successfully: ${name} (ID: ${data.prize_id})`);
+                    hideAddPrizeForm();
+                    await loadPrizes();
+                    await refreshData();
+                } else {
+                    addToOutput(`❌ Error adding prize: ${data.error}`);
+                }
+            } catch (error) {
+                addToOutput(`❌ Error adding prize: ${error.message}`);
+            }
+        }
+
+        async function deletePrize(prizeId, prizeName) {
+            if (!authToken) return;
+            
+            if (!confirm(`⚠️ Are you sure you want to delete "${prizeName}"? This will remove all associated data including transactions.`)) {
+                return;
+            }
+            
+            addToOutput(`🗑️ Deleting prize: ${prizeName}...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/prizes/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        prize_id: prizeId,
+                        date: getCurrentDate()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ Prize deleted: ${prizeName}`);
+                    await loadPrizes();
+                    await refreshData();
+                } else {
+                    addToOutput(`❌ Error deleting prize: ${data.error}`);
+                }
+            } catch (error) {
+                addToOutput(`❌ Error deleting prize: ${error.message}`);
+            }
+        }
+
+        async function exportToCSV() {
+            if (!authToken) return;
+            
+            addToOutput('📤 Exporting prizes to CSV format...');
+            
+            try {
+                const date = getCurrentDate();
+                const response = await fetch(`${API_BASE}/admin/prizes/list?admin_password=${authToken}&date=${date}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    let csvContent = 'Item,Category,Quantity,Daily Limit,Emoji\n';
+                    
+                    data.prizes.forEach(prize => {
+                        csvContent += `"${prize.name}","${prize.category}",${prize.quantity},${prize.daily_limit},"${prize.emoji || '🎁'}"\n`;
+                    });
+                    
+                    // Create and download file
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `prizes_${date}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    addToOutput(`✅ Exported ${data.prizes.length} prizes to CSV`);
+                } else {
+                    addToOutput('❌ Error exporting: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error exporting: ' + error.message);
+            }
+        }
+
+        async function loadDailyCSV() {
+            if (!authToken) return;
+            
+            addToOutput('📋 Loading daily CSV file for current date...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/load-daily-csv`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        date: getCurrentDate()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ Daily CSV loaded successfully for ${data.date}`);
+                    await refreshData();
+                    await loadPrizes();
+                } else {
+                    addToOutput('❌ Failed to load daily CSV: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error loading daily CSV: ' + error.message);
+            }
+        }
+
+        async function validateItemlist() {
+            if (!authToken) return;
+            
+            addToOutput('✅ Validating itemlist_dates_v2.txt format...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/validate-itemlist`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const results = data.validation_results;
+                    const summary = data.summary;
+                    
+                    addToOutput(`📄 File: ${results.file_path}`);
+                    addToOutput(`📊 Validation Results:`);
+                    addToOutput(`   Total lines: ${results.total_lines}`);
+                    addToOutput(`   Valid items: ${results.valid_items}`);
+                    addToOutput(`   Invalid items: ${results.invalid_items}`);
+                    addToOutput(`   Categories: Common(${summary.categories.common}) Rare(${summary.categories.rare}) Ultra-rare(${summary.categories.ultra_rare})`);
+                    
+                    if (data.is_valid) {
+                        addToOutput('✅ Format validation: PASSED');
+                    } else {
+                        addToOutput('❌ Format validation: FAILED');
+                        addToOutput(`   Errors: ${summary.error_count}`);
                     }
-                });
-                
-                const invData = await invResponse.json();
-                let limitedItems = [];
-                
-                if (invData.success && invData.inventory) {
-                    limitedItems = invData.inventory.filter(item => 
-                        !item.is_unlimited && item.per_day_limit && item.per_day_limit < 100
-                    );
+                    
+                    if (summary.warning_count > 0) {
+                        addToOutput(`⚠️  Warnings: ${summary.warning_count}`);
+                    }
+                    
+                    // Show errors and warnings
+                    if (results.errors.length > 0) {
+                        addToOutput('❌ Errors found:');
+                        results.errors.forEach(error => addToOutput(`   ${error}`));
+                    }
+                    
+                    if (results.warnings.length > 0) {
+                        addToOutput('⚠️  Warnings:');
+                        results.warnings.forEach(warning => addToOutput(`   ${warning}`));
+                    }
+                    
+                    // Show sample items
+                    if (results.sample_items.length > 0) {
+                        addToOutput('📋 Sample items:');
+                        results.sample_items.forEach(item => {
+                            addToOutput(`   ${item.id}: ${item.name} (${item.category}) - Qty:${item.quantity} Limit:${item.daily_limit} ${item.emoji}`);
+                        });
+                    }
+                } else {
+                    addToOutput('❌ Validation failed: ' + data.error);
                 }
-                
-                const limitStatus = limitedItems.length > 0;
-                const limitMessage = limitStatus ? 
-                    `Found ${limitedItems.length} items with daily limits` : 
-                    'No items with daily limits found for today';
-                
-                addResult('Daily Limits', limitStatus, limitMessage);
             } catch (error) {
-                addResult('Daily Limits', false, error.message);
-            }
-            
-            // Test 6: Server-Authoritative Wheel
-            try {
-                // Test a spin to verify server-authoritative wheel
-                const spinResponse = await fetch(`${API_BASE}/admin/test-spin`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        admin_password: authToken,
-                        user_id: 'system_verifier',
-                        test_date: new Date().toISOString().split('T')[0]
-                    })
-                });
-                
-                const spinData = await spinResponse.json();
-                const wheelStatus = spinData.success && 
-                                   spinData.sector_index !== undefined && 
-                                   spinData.sector_center !== undefined;
-                
-                let wheelMessage = '';
-                if (wheelStatus) {
-                    wheelMessage = `Prize: ${spinData.prize.name}, ` +
-                                 `Sector: ${spinData.sector_index}, ` +
-                                 `Angle: ${spinData.sector_center.toFixed(2)}°`;
-                }
-                
-                addResult('Server-Authoritative Wheel', wheelStatus, wheelMessage);
-            } catch (error) {
-                addResult('Server-Authoritative Wheel', false, error.message);
-            }
-            
-            // Test 7: Dynamic Prize Count
-            try {
-                // Get all active prizes to check dynamic prize count
-                const prizesResponse = await fetch(`${API_BASE}/prizes/wheel-display`);
-                const prizesData = await prizesResponse.json();
-                
-                // Test a spin to get sector calculation
-                const spinResponse = await fetch(`${API_BASE}/admin/test-spin`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        admin_password: authToken,
-                        user_id: 'system_verifier_dynamic',
-                        test_date: new Date().toISOString().split('T')[0]
-                    })
-                });
-                
-                const spinData = await spinResponse.json();
-                
-                // Check if sector calculation is dynamic
-                const totalPrizes = prizesData.length;
-                const sectorAngle = 360 / totalPrizes;
-                const expectedSectorCenter = (spinData.sector_index * sectorAngle) + (sectorAngle / 2);
-                const actualSectorCenter = spinData.sector_center;
-                
-                // Allow for small floating point differences
-                const isDynamic = Math.abs(expectedSectorCenter - actualSectorCenter) < 0.1;
-                
-                const dynamicMessage = isDynamic ? 
-                    `Total prizes: ${totalPrizes}, Sector angle: ${sectorAngle.toFixed(2)}°` : 
-                    `Expected: ${expectedSectorCenter.toFixed(2)}°, Actual: ${actualSectorCenter.toFixed(2)}°`;
-                
-                addResult('Dynamic Prize Count', isDynamic, dynamicMessage);
-            } catch (error) {
-                addResult('Dynamic Prize Count', false, error.message);
-            }
-        }
-
-        function showError(message, container = null) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = message;
-            
-            if (container) {
-                container.innerHTML = '';
-                container.appendChild(errorDiv);
-            } else {
-                document.body.appendChild(errorDiv);
-                setTimeout(() => errorDiv.remove(), 5000);
-            }
-        }
-
-        function showSuccess(message, container = null) {
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.textContent = message;
-            
-            if (container) {
-                container.innerHTML = '';
-                container.appendChild(successDiv);
-            } else {
-                document.body.appendChild(successDiv);
-                setTimeout(() => successDiv.remove(), 3000);
+                addToOutput('❌ Error validating itemlist: ' + error.message);
             }
         }
     </script>

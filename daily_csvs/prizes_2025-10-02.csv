@@ -1,17 +1,17 @@
-Item,Category,Quantity,Daily Limit,Available Dates
-smartwatch + mini cooler,Common,100,100,2025-10-02
-power bank + neckband,Common,100,100,2025-10-02
-luggage bags,Common,100,100,2025-10-02
-Free pouch and screen guard,Common,10,5,2025-10-02
-Dinner Set,Common,20,5,2025-10-02
-Earbuds and G.Speaker,Common,10,3,2025-10-02
-jio tab,Rare,2,1,2025-10-02
-intex home theatre,Rare,4,1,2025-10-02
-Mi smart speaker,Rare,1,1,2025-10-02
-zebronics astra BT speaker,Rare,9,1,2025-10-02
-boult 60w soundbar,Rare,6,1,2025-10-02
-gas stove,Rare,3,1,2025-10-02
-Mixer Grinder,Rare,6,1,2025-10-02
-pressure cooker,Common,5,1,2025-10-02
-refrigerator,Ultra Rare,1,1,2025-10-02
-Budget Smartphone,Ultra Rare,1,1,2025-10-02
+Item,Category,Quantity,Daily Limit,Emoji
+smartwatch + mini cooler,common,30,5,⌚
+power bank + neckband,common,30,5,🔋
+luggage bags,common,30,5,🧳
+Free pouch and screen guard,common,30,5,📱
+Dinner Set,common,30,5,🍽️
+Earbuds and G.Speaker,common,30,5,🎧
+jio tab,rare,2,1,📱
+intex home theatre,rare,4,1,🎵
+Mi smart speaker,rare,1,1,🔊
+zebronics astra BT speaker,rare,9,1,🔊
+boult 60w soundbar,rare,6,1,🔊
+gas stove,rare,3,1,🔥
+Mixer Grinder,rare,6,1,⚡
+pressure cooker,rare,5,1,🍲
+refrigerator,ultra_rare,1,1,❄️
+Budget Smartphone,ultra_rare,1,1,📱

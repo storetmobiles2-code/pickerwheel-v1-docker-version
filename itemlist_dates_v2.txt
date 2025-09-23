@@ -6,12 +6,12 @@
 # Description: Optional description
 
 # Common Items (ID: 1-6)
-1,smartwatch + mini cooler,common,100,100,*,⌚,Smartwatch with mini cooler combo
-2,power bank + neckband,common,100,100,*,🔋,Power bank with neckband combo
-3,luggage bags,common,100,100,*,🧳,Travel luggage bags
-4,Free pouch and screen guard,common,10,5,*,📱,Free pouch and screen guard
-5,Dinner Set,common,20,5,*,🍽️,Complete dinner set
-6,Earbuds and G.Speaker,common,10,3,*,🎧,Earbuds and gaming speaker combo
+1,smartwatch + mini cooler,common,30,5,*,⌚,Smartwatch with mini cooler combo
+2,power bank + neckband,common,30,5,*,🔋,Power bank with neckband combo
+3,luggage bags,common,30,5,*,🧳,Travel luggage bags
+4,Free pouch and screen guard,common,30,5,*,📱,Free pouch and screen guard
+5,Dinner Set,common,30,5,*,🍽️,Complete dinner set
+6,Earbuds and G.Speaker,common,30,5,*,🎧,Earbuds and gaming speaker combo
 
 # Rare Items (ID: 7-14)
 7,jio tab,rare,2,1,2025-10-02|2025-10-07|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28,📱,Jio tablet

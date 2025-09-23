@@ -429,7 +429,7 @@ class DailyPrizeManager:
             conn.close()
     
     def select_prize_with_priority(self, target_date: date, user_identifier: str) -> Optional[Dict]:
-        """Select a prize with priority for rare/ultra rare items and daily limit enforcement"""
+        """Select a prize with AGGRESSIVE priority for rare/ultra rare items (3-5 spin guarantee)"""
         available_prizes = self.get_available_prizes(target_date)
         
         if not available_prizes:
@@ -443,7 +443,7 @@ class DailyPrizeManager:
         
         logger.info(f"Prize availability: {len(ultra_rare)} ultra-rare, {len(rare)} rare, {len(common)} common")
         
-        # Get today's win statistics for better distribution
+        # Get today's win statistics for aggressive selection
         date_str = target_date.isoformat()
         conn = self.db_manager.get_connection()
         cursor = conn.cursor()
@@ -453,7 +453,9 @@ class DailyPrizeManager:
             cursor.execute('''
                 SELECT 
                     COUNT(*) as total_wins,
-                    SUM(CASE WHEN dp.category IN ('rare', 'ultra_rare') THEN 1 ELSE 0 END) as rare_wins
+                    SUM(CASE WHEN dp.category = 'ultra_rare' THEN 1 ELSE 0 END) as ultra_rare_wins,
+                    SUM(CASE WHEN dp.category = 'rare' THEN 1 ELSE 0 END) as rare_wins,
+                    SUM(CASE WHEN dp.category IN ('rare', 'ultra_rare') THEN 1 ELSE 0 END) as total_rare_wins
                 FROM daily_transactions dt
                 JOIN daily_prizes dp ON dt.prize_id = dp.prize_id AND dt.date = dp.date
                 WHERE dt.date = ? AND dt.transaction_type = 'win'
@@ -461,54 +463,118 @@ class DailyPrizeManager:
             
             stats = cursor.fetchone()
             total_wins = stats['total_wins'] if stats and stats['total_wins'] else 0
+            ultra_rare_wins = stats['ultra_rare_wins'] if stats and stats['ultra_rare_wins'] else 0
             rare_wins = stats['rare_wins'] if stats and stats['rare_wins'] else 0
+            total_rare_wins = stats['total_rare_wins'] if stats and stats['total_rare_wins'] else 0
             
-            # Calculate rare item percentage
-            rare_percentage = rare_wins / total_wins if total_wins > 0 else 0
-            target_rare_percentage = 0.30  # Target 30% rare items
+            logger.info(f"🎯 AGGRESSIVE SELECTION - Today's stats: {total_wins} total, {ultra_rare_wins} ultra-rare, {rare_wins} rare")
             
-            logger.info(f"Today's stats: {total_wins} total wins, {rare_wins} rare wins ({rare_percentage:.1%})")
-            
-            # Force rare item selection if we're below target and rare items are available
-            force_rare = (rare_percentage < target_rare_percentage) and (ultra_rare or rare)
-            
-            # Selection logic with enhanced rare item priority
+            # SUPER AGGRESSIVE SELECTION LOGIC FOR GUARANTEED 3-5 SPIN WINS
             selected_prize = None
+            selection_reason = ""
             
-            if force_rare or ((ultra_rare or rare) and random.random() < 0.5):
-                # 50% chance for rare items, or forced if below target
-                logger.info("🎯 Selecting from rare/ultra-rare items")
-                if ultra_rare and random.random() < 0.3:  # 30% chance for ultra-rare if available
-                    selected_prize = random.choice(ultra_rare)
-                    logger.info(f"Selected ultra-rare: {selected_prize['name']}")
+            # PRIORITY 1: FORCE ultra-rare items in first 2 spins (95% chance)
+            if ultra_rare and total_wins < 2:
+                # 95% chance for ultra-rare in first 2 spins
+                if random.random() < 0.95:
+                    selected_prize = self._weighted_selection(ultra_rare, "ultra_rare")
+                    selection_reason = f"🚀 ULTRA-RARE FORCE (spin #{total_wins + 1}/2) - 95% chance"
+            
+            # PRIORITY 2: FORCE rare items in spin 1-3 if no ultra-rare (90% chance)
+            if not selected_prize and rare and total_wins < 3 and ultra_rare_wins == 0:
+                # 90% chance for rare in first 3 spins if no ultra-rare won
+                if random.random() < 0.90:
+                    selected_prize = self._weighted_selection(rare, "rare")
+                    selection_reason = f"🎯 RARE FORCE (spin #{total_wins + 1}/3) - 90% chance"
+            
+            # PRIORITY 3: ABSOLUTE GUARANTEE by spin 3-5 if no rare/ultra-rare won
+            if not selected_prize and (rare or ultra_rare) and total_wins >= 2 and total_rare_wins == 0:
+                # 100% guarantee rare/ultra-rare by spin 3-5
+                if ultra_rare:
+                    selected_prize = self._weighted_selection(ultra_rare, "ultra_rare")
+                    selection_reason = f"⚡ ULTRA-RARE GUARANTEE (spin #{total_wins + 1}) - 100% FORCE"
                 elif rare:
-                    selected_prize = random.choice(rare)
-                    logger.info(f"Selected rare: {selected_prize['name']}")
+                    selected_prize = self._weighted_selection(rare, "rare")
+                    selection_reason = f"⚡ RARE GUARANTEE (spin #{total_wins + 1}) - 100% FORCE"
             
-            # If no rare item selected, pick from common
-            if not selected_prize and common:
-                selected_prize = random.choice(common)
-                logger.info(f"Selected common: {selected_prize['name']}")
+            # PRIORITY 4: High chance for rare items even after one rare won (to respect daily limits)
+            if not selected_prize and (rare or ultra_rare) and total_wins < 5:
+                if ultra_rare and random.random() < 0.7:  # 70% ultra-rare
+                    selected_prize = self._weighted_selection(ultra_rare, "ultra_rare")
+                    selection_reason = f"🎯 ULTRA-RARE HIGH PRIORITY (spin #{total_wins + 1})"
+                elif rare and random.random() < 0.8:  # 80% rare
+                    selected_prize = self._weighted_selection(rare, "rare")
+                    selection_reason = f"🎯 RARE HIGH PRIORITY (spin #{total_wins + 1})"
             
-            # Final fallback to any available prize
+            # PRIORITY 5: Normal weighted selection for remaining spins
+            if not selected_prize:
+                if ultra_rare and random.random() < 0.5:  # 50% ultra-rare
+                    selected_prize = self._weighted_selection(ultra_rare, "ultra_rare")
+                    selection_reason = "🎲 Normal ultra-rare selection"
+                elif rare and random.random() < 0.6:  # 60% rare
+                    selected_prize = self._weighted_selection(rare, "rare")
+                    selection_reason = "🎲 Normal rare selection"
+                elif common:
+                    selected_prize = self._weighted_selection(common, "common")
+                    selection_reason = "🎲 Common selection"
+            
+            # Final fallback
             if not selected_prize:
                 selected_prize = random.choice(available_prizes)
-                logger.info(f"Fallback selection: {selected_prize['name']}")
+                selection_reason = "🔄 Fallback selection"
             
             # Log selection details
             if selected_prize:
-                logger.info(f"🎲 Prize selected: {selected_prize['name']} ({selected_prize['category']}) - "
+                logger.info(f"🎲 {selection_reason}: {selected_prize['name']} ({selected_prize['category']}) - "
                            f"Wins today: {selected_prize.get('wins_today', 0)}/{selected_prize['daily_limit']}, "
                            f"Remaining: {selected_prize['remaining_quantity']}")
             
             return selected_prize
             
         except Exception as e:
-            logger.error(f"Error in prize selection: {e}")
+            logger.error(f"Error in aggressive prize selection: {e}")
             # Fallback to simple random selection
             return random.choice(available_prizes) if available_prizes else None
         finally:
             conn.close()
+    
+    def _weighted_selection(self, prizes: List[Dict], category: str) -> Dict:
+        """Weighted selection within a category based on remaining quantity and daily limits"""
+        if not prizes:
+            return None
+        
+        # Calculate weights based on scarcity (lower remaining = higher weight)
+        weighted_prizes = []
+        for prize in prizes:
+            # Base weight inversely proportional to remaining quantity
+            base_weight = max(1, 10 - prize['remaining_quantity'])
+            
+            # Boost weight for items with fewer wins today
+            wins_today = prize.get('wins_today', 0)
+            daily_limit = prize['daily_limit']
+            availability_boost = max(1, daily_limit - wins_today)
+            
+            # Category-specific multipliers (SUPER BOOSTED)
+            if category == "ultra_rare":
+                category_multiplier = 50  # 50x boost for ultra-rare (was 10x)
+            elif category == "rare":
+                category_multiplier = 25  # 25x boost for rare (was 5x)
+            else:
+                category_multiplier = 1   # Normal weight for common
+            
+            final_weight = base_weight * availability_boost * category_multiplier
+            
+            # Add multiple copies based on weight for selection
+            for _ in range(int(final_weight)):
+                weighted_prizes.append(prize)
+        
+        if weighted_prizes:
+            selected = random.choice(weighted_prizes)
+            logger.debug(f"Weighted selection from {len(prizes)} {category} items: {selected['name']} "
+                        f"(weight factor: {len([p for p in weighted_prizes if p['name'] == selected['name']])}/{len(weighted_prizes)})")
+            return selected
+        
+        return random.choice(prizes)
     
     def consume_prize(self, prize_id: int, prize_name: str, target_date: date, user_identifier: str) -> bool:
         """Consume a prize and record transaction"""
@@ -975,6 +1041,569 @@ def admin_get_transactions():
         
     except Exception as e:
         logger.error(f"Error getting transactions: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Additional Admin Endpoints for Daily CSV Management
+
+@app.route('/api/admin/reset-database', methods=['POST'])
+def admin_reset_database():
+    """Admin endpoint to reset database for testing"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        confirm = data.get('confirm', False)
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        if not confirm:
+            return jsonify({'success': False, 'error': 'Confirmation required'}), 400
+        
+        # Reset database
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Clear all tables
+        cursor.execute('DELETE FROM daily_transactions')
+        cursor.execute('DELETE FROM daily_inventory')  
+        cursor.execute('DELETE FROM daily_prizes')
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info("🔄 Database reset by admin")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database reset successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resetting database: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/regenerate-csvs', methods=['POST'])
+def admin_regenerate_csvs():
+    """Admin endpoint to regenerate daily CSV files from itemlist_dates.txt"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        # Import and run the CSV regeneration script
+        import subprocess
+        import os
+        
+        script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'update_csvs_from_v2.py')
+        result = subprocess.run(['python3', script_path], capture_output=True, text=True, cwd=os.path.dirname(script_path))
+        
+        if result.returncode == 0:
+            logger.info("📊 Daily CSVs regenerated by admin")
+            return jsonify({
+                'success': True,
+                'message': 'Daily CSV files regenerated successfully',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'CSV regeneration failed',
+                'details': result.stderr
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error regenerating CSVs: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/daily-limits-status', methods=['GET'])
+def admin_daily_limits_status():
+    """Admin endpoint to get current daily limits status"""
+    try:
+        admin_password = request.args.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = request.args.get('date', date.today().isoformat())
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Get daily limits status
+        cursor.execute('''
+            SELECT dp.name, dp.category, dp.daily_limit, 
+                   COALESCE(today_wins.wins_today, 0) as wins_today,
+                   di.remaining_quantity,
+                   CASE 
+                       WHEN COALESCE(today_wins.wins_today, 0) >= dp.daily_limit THEN 'EXHAUSTED'
+                       WHEN di.remaining_quantity <= 0 THEN 'OUT_OF_STOCK'
+                       ELSE 'AVAILABLE'
+                   END as status
+            FROM daily_prizes dp
+            JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
+            LEFT JOIN (
+                SELECT prize_id, COUNT(*) as wins_today
+                FROM daily_transactions 
+                WHERE date = ? AND transaction_type = 'win'
+                GROUP BY prize_id
+            ) today_wins ON dp.prize_id = today_wins.prize_id
+            WHERE dp.date = ?
+            ORDER BY dp.category, dp.name
+        ''', (target_date, target_date))
+        
+        limits_status = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        # Calculate summary
+        summary = {
+            'total_items': len(limits_status),
+            'available': len([item for item in limits_status if item['status'] == 'AVAILABLE']),
+            'exhausted': len([item for item in limits_status if item['status'] == 'EXHAUSTED']),
+            'out_of_stock': len([item for item in limits_status if item['status'] == 'OUT_OF_STOCK'])
+        }
+        
+        return jsonify({
+            'success': True,
+            'date': target_date,
+            'limits_status': limits_status,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting daily limits status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/test-selection', methods=['POST'])
+def admin_test_selection():
+    """Admin endpoint to test the aggressive selection logic"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        test_date = data.get('date', date.today().isoformat())
+        num_tests = data.get('num_tests', 5)
+        
+        # Parse date
+        target_date = datetime.fromisoformat(test_date).date()
+        
+        # Run selection tests
+        results = []
+        for i in range(num_tests):
+            selected_prize = daily_backend.select_prize_with_priority(target_date, f"admin_test_{i}")
+            if selected_prize:
+                results.append({
+                    'test_number': i + 1,
+                    'prize_name': selected_prize['name'],
+                    'category': selected_prize['category'],
+                    'wins_today': selected_prize.get('wins_today', 0),
+                    'daily_limit': selected_prize['daily_limit'],
+                    'remaining_quantity': selected_prize['remaining_quantity']
+                })
+            else:
+                results.append({
+                    'test_number': i + 1,
+                    'error': 'No prize selected'
+                })
+        
+        # Calculate category distribution
+        categories = {}
+        for result in results:
+            if 'category' in result:
+                category = result['category']
+                categories[category] = categories.get(category, 0) + 1
+        
+        return jsonify({
+            'success': True,
+            'date': test_date,
+            'num_tests': num_tests,
+            'results': results,
+            'category_distribution': categories
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing selection: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Live Database Editor Endpoints
+
+@app.route('/api/admin/prizes/list', methods=['GET'])
+def admin_list_prizes():
+    """Admin endpoint to list all prizes for a specific date"""
+    try:
+        admin_password = request.args.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = request.args.get('date', date.today().isoformat())
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Get all prizes for the date with current status
+        cursor.execute('''
+            SELECT dp.prize_id, dp.name, dp.category, dp.quantity, dp.daily_limit, 
+                   dp.available_dates, dp.emoji,
+                   di.remaining_quantity,
+                   COALESCE(today_wins.wins_today, 0) as wins_today
+            FROM daily_prizes dp
+            LEFT JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
+            LEFT JOIN (
+                SELECT prize_id, COUNT(*) as wins_today
+                FROM daily_transactions 
+                WHERE date = ? AND transaction_type = 'win'
+                GROUP BY prize_id
+            ) today_wins ON dp.prize_id = today_wins.prize_id
+            WHERE dp.date = ?
+            ORDER BY dp.prize_id
+        ''', (target_date, target_date))
+        
+        prizes = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'date': target_date,
+            'prizes': prizes,
+            'total_count': len(prizes)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing prizes: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/prizes/update', methods=['POST'])
+def admin_update_prize():
+    """Admin endpoint to update a specific prize"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        prize_id = data.get('prize_id')
+        target_date = data.get('date', date.today().isoformat())
+        updates = data.get('updates', {})
+        
+        if not prize_id or not updates:
+            return jsonify({'success': False, 'error': 'Prize ID and updates required'}), 400
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Build dynamic update query for daily_prizes
+        prize_updates = []
+        prize_values = []
+        
+        allowed_prize_fields = ['name', 'category', 'quantity', 'daily_limit', 'emoji']
+        for field in allowed_prize_fields:
+            if field in updates:
+                prize_updates.append(f"{field} = ?")
+                prize_values.append(updates[field])
+        
+        if prize_updates:
+            prize_values.extend([target_date, prize_id])
+            cursor.execute(f'''
+                UPDATE daily_prizes 
+                SET {', '.join(prize_updates)}
+                WHERE date = ? AND prize_id = ?
+            ''', prize_values)
+        
+        # Update inventory if remaining_quantity is provided
+        if 'remaining_quantity' in updates:
+            cursor.execute('''
+                UPDATE daily_inventory 
+                SET remaining_quantity = ?
+                WHERE date = ? AND prize_id = ?
+            ''', (updates['remaining_quantity'], target_date, prize_id))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"🔧 Prize {prize_id} updated by admin: {updates}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Prize {prize_id} updated successfully',
+            'updated_fields': list(updates.keys())
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating prize: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/prizes/add', methods=['POST'])
+def admin_add_prize():
+    """Admin endpoint to add a new prize for a specific date"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = data.get('date', date.today().isoformat())
+        prize_data = data.get('prize', {})
+        
+        required_fields = ['name', 'category', 'quantity', 'daily_limit']
+        for field in required_fields:
+            if field not in prize_data:
+                return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Get next available prize_id
+        cursor.execute('SELECT MAX(prize_id) FROM daily_prizes WHERE date = ?', (target_date,))
+        max_id = cursor.fetchone()[0] or 0
+        new_prize_id = max_id + 1
+        
+        # Insert into daily_prizes
+        cursor.execute('''
+            INSERT INTO daily_prizes (prize_id, name, category, quantity, daily_limit, date, available_dates, emoji)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            new_prize_id,
+            prize_data['name'],
+            prize_data['category'],
+            prize_data['quantity'],
+            prize_data['daily_limit'],
+            target_date,
+            prize_data.get('available_dates', '*'),
+            prize_data.get('emoji', '🎁')
+        ))
+        
+        # Insert into daily_inventory
+        cursor.execute('''
+            INSERT INTO daily_inventory (prize_id, date, name, initial_quantity, remaining_quantity, daily_limit)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (new_prize_id, target_date, prize_data['name'], prize_data['quantity'], prize_data['quantity'], prize_data['daily_limit']))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"➕ New prize added by admin: {prize_data['name']} (ID: {new_prize_id})")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Prize "{prize_data["name"]}" added successfully',
+            'prize_id': new_prize_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding prize: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/prizes/delete', methods=['POST'])
+def admin_delete_prize():
+    """Admin endpoint to delete a prize for a specific date"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        prize_id = data.get('prize_id')
+        target_date = data.get('date', date.today().isoformat())
+        
+        if not prize_id:
+            return jsonify({'success': False, 'error': 'Prize ID required'}), 400
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Get prize name for logging
+        cursor.execute('SELECT name FROM daily_prizes WHERE date = ? AND prize_id = ?', (target_date, prize_id))
+        prize_name = cursor.fetchone()
+        prize_name = prize_name[0] if prize_name else f"ID {prize_id}"
+        
+        # Delete from all tables
+        cursor.execute('DELETE FROM daily_transactions WHERE date = ? AND prize_id = ?', (target_date, prize_id))
+        cursor.execute('DELETE FROM daily_inventory WHERE date = ? AND prize_id = ?', (target_date, prize_id))
+        cursor.execute('DELETE FROM daily_prizes WHERE date = ? AND prize_id = ?', (target_date, prize_id))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"🗑️ Prize deleted by admin: {prize_name} (ID: {prize_id})")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Prize "{prize_name}" deleted successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting prize: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/load-daily-csv', methods=['POST'])
+def admin_load_daily_csv():
+    """Admin endpoint to load prizes directly from daily CSV file"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = data.get('date', date.today().isoformat())
+        
+        # Load prizes from CSV for this date
+        csv_dir = os.path.join(os.path.dirname(__file__), '..', 'daily_csvs')
+        prize_manager_instance = DailyPrizeManager(csv_dir, db_manager)
+        success = prize_manager_instance.sync_all_items_to_database(datetime.fromisoformat(target_date).date())
+        
+        if success:
+            logger.info(f"📊 Daily CSV loaded by admin for {target_date}")
+            return jsonify({
+                'success': True,
+                'message': f'Daily CSV loaded successfully for {target_date}',
+                'date': target_date
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to load daily CSV for {target_date}'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error loading daily CSV: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/validate-itemlist', methods=['POST'])
+def admin_validate_itemlist():
+    """Admin endpoint to validate itemlist_dates_v2.txt format"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        # Try to find itemlist_dates_v2.txt
+        import os
+        possible_paths = [
+            'itemlist_dates_v2.txt',
+            '/app/itemlist_dates_v2.txt',
+            os.path.join(os.path.dirname(__file__), '..', 'itemlist_dates_v2.txt')
+        ]
+        
+        itemlist_file = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                itemlist_file = path
+                break
+        
+        if not itemlist_file:
+            return jsonify({
+                'success': False,
+                'error': 'itemlist_dates_v2.txt not found',
+                'searched_paths': possible_paths
+            }), 404
+        
+        # Validate format
+        validation_results = {
+            'file_path': itemlist_file,
+            'total_lines': 0,
+            'valid_items': 0,
+            'invalid_items': 0,
+            'categories': {'common': 0, 'rare': 0, 'ultra_rare': 0},
+            'errors': [],
+            'warnings': [],
+            'sample_items': []
+        }
+        
+        with open(itemlist_file, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                validation_results['total_lines'] += 1
+                line = line.strip()
+                
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+                
+                try:
+                    parts = [part.strip() for part in line.split(',')]
+                    if len(parts) < 6:
+                        validation_results['errors'].append(f"Line {line_num}: Insufficient columns (need at least 6)")
+                        validation_results['invalid_items'] += 1
+                        continue
+                    
+                    # Validate required fields
+                    item_id = int(parts[0])
+                    name = parts[1]
+                    category = parts[2].lower()
+                    quantity = int(parts[3])
+                    daily_limit = int(parts[4])
+                    available_dates = parts[5]
+                    emoji = parts[6] if len(parts) > 6 else '🎁'
+                    
+                    # Validate category
+                    if category not in ['common', 'rare', 'ultra_rare']:
+                        validation_results['errors'].append(f"Line {line_num}: Invalid category '{category}' (must be common, rare, or ultra_rare)")
+                        validation_results['invalid_items'] += 1
+                        continue
+                    
+                    # Validate quantities
+                    if quantity <= 0 or daily_limit <= 0:
+                        validation_results['errors'].append(f"Line {line_num}: Quantity and daily_limit must be > 0")
+                        validation_results['invalid_items'] += 1
+                        continue
+                    
+                    # Validate available_dates format
+                    if available_dates != '*' and '|' in available_dates:
+                        # Check date format
+                        dates = available_dates.split('|')
+                        for date_str in dates:
+                            try:
+                                datetime.strptime(date_str, '%Y-%m-%d')
+                            except ValueError:
+                                validation_results['warnings'].append(f"Line {line_num}: Invalid date format '{date_str}' (should be YYYY-MM-DD)")
+                    
+                    # Valid item
+                    validation_results['valid_items'] += 1
+                    validation_results['categories'][category] += 1
+                    
+                    # Add to sample (first 3 of each category)
+                    if len([item for item in validation_results['sample_items'] if item['category'] == category]) < 3:
+                        validation_results['sample_items'].append({
+                            'id': item_id,
+                            'name': name,
+                            'category': category,
+                            'quantity': quantity,
+                            'daily_limit': daily_limit,
+                            'emoji': emoji
+                        })
+                    
+                except (ValueError, IndexError) as e:
+                    validation_results['errors'].append(f"Line {line_num}: Parse error - {str(e)}")
+                    validation_results['invalid_items'] += 1
+        
+        # Generate summary
+        is_valid = validation_results['invalid_items'] == 0
+        
+        return jsonify({
+            'success': True,
+            'is_valid': is_valid,
+            'validation_results': validation_results,
+            'summary': {
+                'total_items': validation_results['valid_items'],
+                'error_count': len(validation_results['errors']),
+                'warning_count': len(validation_results['warnings']),
+                'categories': validation_results['categories']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error validating itemlist: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
