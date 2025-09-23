@@ -308,9 +308,15 @@ class DailyPrizeManager:
         cursor = conn.cursor()
         
         try:
-            # Clear existing data for this date
-            cursor.execute('DELETE FROM daily_prizes WHERE date = ?', (date_str,))
-            cursor.execute('DELETE FROM daily_inventory WHERE date = ?', (date_str,))
+            # ✅ FIX: Preserve existing inventory and transaction history
+            cursor.execute('SELECT COUNT(*) FROM daily_prizes WHERE date = ?', (date_str,))
+            existing_count = cursor.fetchone()[0]
+            
+            if existing_count > 0:
+                logger.info(f"📊 Data already exists for {date_str} ({existing_count} prizes), preserving transaction history and inventory")
+                return True
+            
+            logger.info(f"📊 First sync for {date_str}, initializing fresh database...")
             
             for prize in all_prizes:
                 # Determine if item is available on this date
@@ -352,12 +358,54 @@ class DailyPrizeManager:
             
             conn.commit()
             logger.info(f"Synced {len(all_prizes)} items to database for {date_str}")
+            
+            # ✅ FIX: Add database integrity check after sync
+            self._validate_database_integrity(target_date)
             return True
             
         except Exception as e:
             logger.error(f"Error syncing items to database: {e}")
             conn.rollback()
             return False
+        finally:
+            conn.close()
+    
+    def _validate_database_integrity(self, target_date: date):
+        """✅ FIX: Validate database integrity and consistency"""
+        date_str = target_date.isoformat()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Check 1: Verify no negative quantities
+            cursor.execute('''
+                SELECT COUNT(*) FROM daily_inventory 
+                WHERE date = ? AND remaining_quantity < 0
+            ''', (date_str,))
+            
+            negative_count = cursor.fetchone()[0]
+            if negative_count > 0:
+                logger.warning(f"⚠️ Found {negative_count} items with negative quantities for {date_str}")
+            
+            # Check 2: Verify daily limits aren't exceeded
+            cursor.execute('''
+                SELECT dp.name, dp.daily_limit, COUNT(dt.prize_id) as actual_wins
+                FROM daily_prizes dp
+                LEFT JOIN daily_transactions dt ON dp.prize_id = dt.prize_id AND dp.date = dt.date
+                WHERE dp.date = ? AND dt.transaction_type = 'win'
+                GROUP BY dp.prize_id, dp.name, dp.daily_limit
+                HAVING COUNT(dt.prize_id) > dp.daily_limit
+            ''', (date_str,))
+            
+            violations = cursor.fetchall()
+            if violations:
+                for violation in violations:
+                    logger.warning(f"⚠️ Daily limit exceeded: {violation['name']} - {violation['actual_wins']}/{violation['daily_limit']}")
+            
+            logger.debug(f"✅ Database integrity check completed for {date_str}")
+            
+        except Exception as e:
+            logger.error(f"Error during integrity check: {e}")
         finally:
             conn.close()
 
