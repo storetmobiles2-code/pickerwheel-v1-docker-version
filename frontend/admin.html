@@ -348,6 +348,88 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Live Inventory Control Styles */
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.25rem 0;
+        }
+
+        .quantity-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .quantity-btn:hover {
+            background: #45a049;
+            transform: scale(1.1);
+        }
+
+        .quantity-btn.decrease {
+            background: #f44336;
+        }
+
+        .quantity-btn.decrease:hover {
+            background: #da190b;
+        }
+
+        .quantity-display {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .quantity-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            width: 60px;
+            text-align: center;
+            color: white;
+        }
+
+        .prize-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 200px 100px;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .prize-row:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .category-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .category-common { background: #2196F3; color: white; }
+        .category-rare { background: #FF9800; color: white; }
+        .category-ultra_rare { background: #9C27B0; color: white; }
     </style>
 </head>
 <body>
@@ -404,14 +486,19 @@
                 <button class="btn" onclick="loadDailyLimits()">🔍 Check Limits</button>
             </div>
 
-            <!-- Live Database Editor -->
-            <div class="section">
-                <h3>🔧 Live Database Editor</h3>
-                <div class="btn-group">
-                    <button class="btn btn-success" onclick="loadPrizes()">📋 Load Prizes</button>
-                    <button class="btn" onclick="showAddPrizeForm()">➕ Add Prize</button>
-                    <button class="btn btn-warning" onclick="exportToCSV()">📤 Export to CSV</button>
-                </div>
+        <!-- Live Database Editor -->
+        <div class="section">
+            <h3>🔧 Live Database Editor</h3>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="loadPrizes()">📋 Load Prizes</button>
+                <button class="btn" onclick="showAddPrizeForm()">➕ Add Prize</button>
+                <button class="btn btn-warning" onclick="exportToCSV()">📤 Export to CSV</button>
+            </div>
+            
+            <!-- Live Inventory Control Notice -->
+            <div style="margin: 1rem 0; padding: 0.5rem; background: rgba(0,255,0,0.1); border-left: 4px solid #4CAF50; border-radius: 4px;">
+                <strong>🎛️ Live Inventory Control:</strong> Use the +/- buttons below to adjust quantities in real-time. Changes are saved instantly and survive restarts!
+            </div>
                 
                 <!-- Add Prize Form (Hidden by default) -->
                 <div id="addPrizeForm" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
@@ -854,8 +941,15 @@
                                    onchange="updatePrizeField(${prize.prize_id}, 'daily_limit', this.value)">
                         </td>
                         <td>
-                            <input type="number" class="editable-input" value="${prize.remaining_quantity || 0}" min="0"
-                                   onchange="updatePrizeField(${prize.prize_id}, 'remaining_quantity', this.value)">
+                            <div class="quantity-controls">
+                                <button class="quantity-btn decrease" onclick="adjustQuantity(${prize.prize_id}, -1)" title="Decrease quantity">−</button>
+                                <span class="quantity-display" id="qty-${prize.prize_id}">${prize.remaining_quantity || 0}</span>
+                                <button class="quantity-btn" onclick="adjustQuantity(${prize.prize_id}, 1)" title="Increase quantity">+</button>
+                                <input type="number" class="quantity-input" value="${prize.remaining_quantity || 0}" min="0"
+                                       onchange="setExactQuantity(${prize.prize_id}, this.value)" 
+                                       onkeypress="if(event.key==='Enter') setExactQuantity(${prize.prize_id}, this.value)"
+                                       title="Set exact quantity">
+                            </div>
                         </td>
                         <td><span class="category-${prize.category}">${prize.wins_today || 0}</span></td>
                         <td>
@@ -1145,6 +1239,85 @@
                 }
             } catch (error) {
                 addToOutput('❌ Error validating itemlist: ' + error.message);
+            }
+        }
+
+        // 🎛️ LIVE INVENTORY CONTROL FUNCTIONS
+        async function adjustQuantity(prizeId, adjustment) {
+            if (!authToken) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/adjust-quantity`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        prize_id: prizeId,
+                        adjustment: adjustment,
+                        date: getCurrentDate()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update the display immediately
+                    const qtyDisplay = document.getElementById(`qty-${prizeId}`);
+                    const qtyInput = document.querySelector(`#prize-row-${prizeId} .quantity-input`);
+                    
+                    if (qtyDisplay) qtyDisplay.textContent = data.new_quantity;
+                    if (qtyInput) qtyInput.value = data.new_quantity;
+                    
+                    addToOutput(`🎛️ ${data.prize_name}: ${data.old_quantity} → ${data.new_quantity} (${data.adjustment > 0 ? '+' : ''}${data.adjustment})`);
+                } else {
+                    addToOutput('❌ Failed to adjust quantity: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error adjusting quantity: ' + error.message);
+            }
+        }
+
+        async function setExactQuantity(prizeId, newQuantity) {
+            if (!authToken) return;
+            
+            const qty = parseInt(newQuantity);
+            if (isNaN(qty) || qty < 0) {
+                addToOutput('❌ Invalid quantity. Must be a non-negative number.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/set-quantity`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        prize_id: prizeId,
+                        quantity: qty,
+                        date: getCurrentDate()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update the display immediately
+                    const qtyDisplay = document.getElementById(`qty-${prizeId}`);
+                    const qtyInput = document.querySelector(`#prize-row-${prizeId} .quantity-input`);
+                    
+                    if (qtyDisplay) qtyDisplay.textContent = data.new_quantity;
+                    if (qtyInput) qtyInput.value = data.new_quantity;
+                    
+                    addToOutput(`🎯 ${data.prize_name}: Set to ${data.new_quantity} (was ${data.old_quantity})`);
+                } else {
+                    addToOutput('❌ Failed to set quantity: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error setting quantity: ' + error.message);
             }
         }
     </script>

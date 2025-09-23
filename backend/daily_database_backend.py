@@ -1654,6 +1654,146 @@ def admin_validate_itemlist():
         logger.error(f"Error validating itemlist: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/admin/adjust-quantity', methods=['POST'])
+def admin_adjust_quantity():
+    """🎛️ Admin endpoint to adjust prize quantities in real-time"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        prize_id = data.get('prize_id')
+        adjustment = data.get('adjustment', 0)  # +1, -1, etc.
+        target_date = data.get('date', date.today().isoformat())
+        
+        if not prize_id:
+            return jsonify({'success': False, 'error': 'Prize ID required'}), 400
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Get current quantity
+            cursor.execute('''
+                SELECT remaining_quantity, name FROM daily_inventory 
+                WHERE date = ? AND prize_id = ?
+            ''', (target_date, prize_id))
+            
+            result = cursor.fetchone()
+            if not result:
+                return jsonify({'success': False, 'error': 'Prize not found for this date'}), 404
+            
+            current_qty = result['remaining_quantity']
+            prize_name = result['name']
+            new_qty = max(0, current_qty + adjustment)  # Don't allow negative
+            
+            # Update quantity
+            cursor.execute('''
+                UPDATE daily_inventory 
+                SET remaining_quantity = ?
+                WHERE date = ? AND prize_id = ?
+            ''', (new_qty, target_date, prize_id))
+            
+            # Log the adjustment
+            cursor.execute('''
+                INSERT INTO daily_transactions (date, prize_id, name, user_identifier, transaction_type, quantity)
+                VALUES (?, ?, ?, 'ADMIN_ADJUSTMENT', 'adjustment', ?)
+            ''', (target_date, prize_id, prize_name, adjustment))
+            
+            conn.commit()
+            
+            logger.info(f"📊 Admin adjusted {prize_name} quantity: {current_qty} → {new_qty} (adjustment: {adjustment:+d})")
+            
+            return jsonify({
+                'success': True,
+                'prize_name': prize_name,
+                'old_quantity': current_qty,
+                'new_quantity': new_qty,
+                'adjustment': adjustment
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error adjusting quantity: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        finally:
+            conn.close()
+    
+    except Exception as e:
+        logger.error(f"Error in quantity adjustment: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/set-quantity', methods=['POST'])
+def admin_set_quantity():
+    """🎯 Admin endpoint to set exact prize quantity"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        prize_id = data.get('prize_id')
+        new_quantity = data.get('quantity', 0)
+        target_date = data.get('date', date.today().isoformat())
+        
+        if not prize_id or new_quantity < 0:
+            return jsonify({'success': False, 'error': 'Valid prize ID and non-negative quantity required'}), 400
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Get current quantity
+            cursor.execute('''
+                SELECT remaining_quantity, name FROM daily_inventory 
+                WHERE date = ? AND prize_id = ?
+            ''', (target_date, prize_id))
+            
+            result = cursor.fetchone()
+            if not result:
+                return jsonify({'success': False, 'error': 'Prize not found for this date'}), 404
+            
+            old_quantity = result['remaining_quantity']
+            prize_name = result['name']
+            
+            # Update quantity
+            cursor.execute('''
+                UPDATE daily_inventory 
+                SET remaining_quantity = ?
+                WHERE date = ? AND prize_id = ?
+            ''', (new_quantity, target_date, prize_id))
+            
+            # Log the change
+            cursor.execute('''
+                INSERT INTO daily_transactions (date, prize_id, name, user_identifier, transaction_type, quantity)
+                VALUES (?, ?, ?, 'ADMIN_SET', 'set_quantity', ?)
+            ''', (target_date, prize_id, prize_name, new_quantity - old_quantity))
+            
+            conn.commit()
+            
+            logger.info(f"📊 Admin set {prize_name} quantity: {old_quantity} → {new_quantity}")
+            
+            return jsonify({
+                'success': True,
+                'prize_name': prize_name,
+                'old_quantity': old_quantity,
+                'new_quantity': new_quantity
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error setting quantity: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        finally:
+            conn.close()
+    
+    except Exception as e:
+        logger.error(f"Error in set quantity: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     logger.info(f"Starting Daily PickerWheel Backend with Database on port {PORT}")
     logger.info(f"Daily CSV directory: {DAILY_CSV_DIR}")
