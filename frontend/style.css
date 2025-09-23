@@ -11,7 +11,7 @@ body {
     font-family: 'Poppins', 'Inter', sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: auto; /* Allow horizontal scrolling if needed to prevent cropping */
     overflow-y: auto;
     position: relative;
     color: #ffffff;
@@ -80,7 +80,7 @@ body {
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 20px 40px; /* Added horizontal padding for wheel box-shadow */
     position: relative;
     z-index: 10;
     width: 100%;
@@ -99,7 +99,7 @@ body {
     align-items: center;
     margin-bottom: 30px;
     padding: 15px 20px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgb(0, 0, 0);
     backdrop-filter: blur(10px);
     border-radius: 15px;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -112,7 +112,7 @@ body {
 }
 
 .logo-img {
-    height: 50px;
+    height: 100px;
     width: auto;
     filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
     transition: all 0.3s ease;
@@ -334,7 +334,7 @@ body {
         #00ffff, #ff00ff, #ffff00, #00ff00, #ff0080, #00ffff);
     border-radius: 20px;
     z-index: -1;
-    animation: neonBorderRotate 4s linear infinite;
+    animation: neonBoxPulse 3s ease-in-out infinite alternate;
 }
 
 /* Add a subtle glow overlay */
@@ -359,25 +359,32 @@ body {
 
 .lucky-draw-animation-container {
     position: relative;
-    width: 120px;
-    height: 60px;
+    width: 140px;
+    height: 80px;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-radius: 10px;
+    border: 1px solid rgba(0, 255, 255, 0.3);
 }
 
-.lucky-draw-icon {
-    font-size: 2.5rem;
-    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+.yamaha-scooter {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    /* Ensure the emoji renders properly */
-    line-height: 1;
-    display: inline-block;
-    will-change: transform; /* Optimize for animations */
-    -webkit-font-smoothing: antialiased;
+    width: 120px;
+    height: 80px;
+    background-image: url('Yamaha-Fascino-scooty.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
+    animation: scooterRide 20s linear infinite;
+    will-change: transform;
+}
+
+.yamaha-scooter.flipped {
+    transform: scaleX(-1);
 }
 
 .lucky-draw-content {
@@ -490,8 +497,8 @@ body {
 
 /* Wheel Styles */
 .wheel {
-    width: 500px;
-    height: 500px;
+    width: 450px;
+    height: 450px;
     border-radius: 50%;
     position: relative;
     box-shadow: 
@@ -501,8 +508,8 @@ body {
     background: #ffffff;
     transition: transform 4s cubic-bezier(0.23, 1, 0.32, 1);
     margin: 0 auto;
-    max-width: 80vw;
-    max-height: 80vw;
+    max-width: 75vw; /* Reduced from 80vw to 75vw for better fit */
+    max-height: 75vw;
     will-change: transform;
     transform-origin: center center;
     contain: layout style paint;
@@ -667,8 +674,8 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 140px;
-    height: 140px;
+    width: 125px;
+    height: 125px;
     background: linear-gradient(135deg, #ff6b6b, #ee5a24);
     border: 6px solid #ffffff;
     border-radius: 50%;
@@ -950,6 +957,21 @@ body {
     }
 }
 
+@keyframes neonBounce {
+    0%, 100% {
+        transform: rotate(0deg) scale(1);
+    }
+    25% {
+        transform: rotate(90deg) scale(1.02);
+    }
+    50% {
+        transform: rotate(180deg) scale(1);
+    }
+    75% {
+        transform: rotate(270deg) scale(1.02);
+    }
+}
+
 @keyframes neonTitlePulse {
     0% {
         text-shadow: 
@@ -976,6 +998,65 @@ body {
             0 0 35px rgba(255, 0, 255, 0.5),
             0 0 45px rgba(255, 255, 0, 0.4),
             inset 0 0 15px rgba(255, 255, 255, 0.3);
+    }
+}
+
+/* Yamaha Fascino Scooter Animation */
+@keyframes scooterRide {
+    /* Phase 1: Start from left, facing right, move to right */
+    0% {
+        left: -70px;
+        transform: scaleX(1) translateY(0px);
+        filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
+    }
+    
+    /* Phase 2: Reach right side */
+    22% {
+        left: calc(100% - 10px);
+        transform: scaleX(1) translateY(0px);
+        filter: drop-shadow(0 0 12px rgba(0, 255, 255, 0.6));
+    }
+    
+    /* Phase 3: U-turn preparation (slight pause and bounce) */
+    25% {
+        left: calc(100% - 10px);
+        transform: scaleX(1) translateY(-5px);
+        filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.7));
+    }
+    
+    /* Phase 4: Complete U-turn (flip to face left) */
+    28% {
+        left: calc(100% - 10px);
+        transform: scaleX(-1) translateY(0px);
+        filter: drop-shadow(0 0 12px rgba(255, 0, 255, 0.6));
+    }
+    
+    /* Phase 5: Move from right to left (facing left) */
+    50% {
+        left: -70px;
+        transform: scaleX(-1) translateY(0px);
+        filter: drop-shadow(0 0 8px rgba(255, 0, 255, 0.4));
+    }
+    
+    /* Phase 6: U-turn preparation at left side */
+    53% {
+        left: -70px;
+        transform: scaleX(-1) translateY(-5px);
+        filter: drop-shadow(0 0 15px rgba(0, 255, 0, 0.7));
+    }
+    
+    /* Phase 7: Complete U-turn (flip to face right again) */
+    56% {
+        left: -70px;
+        transform: scaleX(1) translateY(0px);
+        filter: drop-shadow(0 0 12px rgba(0, 255, 255, 0.6));
+    }
+    
+    /* Phase 8: Return to start position */
+    100% {
+        left: -70px;
+        transform: scaleX(1) translateY(0px);
+        filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
     }
 }
 
@@ -1603,12 +1684,13 @@ body {
     }
     
     .lucky-draw-animation-container {
-        width: 100px;
-        height: 50px;
+        width: 120px;
+        height: 60px;
     }
     
-    .lucky-draw-icon {
-        font-size: 2rem;
+    .yamaha-scooter {
+        width: 50px;
+        height: 32px;
     }
     
     .lucky-draw-title {
@@ -1684,12 +1766,13 @@ body {
     }
     
     .lucky-draw-animation-container {
-        width: 80px;
-        height: 45px;
+        width: 100px;
+        height: 50px;
     }
     
-    .lucky-draw-icon {
-        font-size: 1.8rem;
+    .yamaha-scooter {
+        width: 40px;
+        height: 26px;
     }
     
     .lucky-draw-title {
@@ -1790,7 +1873,7 @@ body {
 
 /* Prevent page shake during animations */
 html {
-    overflow-x: hidden;
+    overflow-x: auto; /* Allow horizontal scrolling if needed to prevent cropping */
     width: 100%;
     max-width: 100vw;
 }
