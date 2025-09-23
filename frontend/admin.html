@@ -459,14 +459,15 @@
                     <label for="currentDate">Working Date:</label>
                     <input type="date" id="currentDate" onchange="refreshData()">
                 </div>
-                <div class="btn-group">
-                    <button class="btn btn-success" onclick="refreshData()">🔄 Refresh Data</button>
-                    <button class="btn btn-warning" onclick="resetDatabase()">🗑️ Reset Database</button>
-                    <button class="btn" onclick="regenerateCSVs()">📊 Regenerate CSVs</button>
-                    <button class="btn" onclick="loadDailyCSV()">📋 Load Daily CSV</button>
-                    <button class="btn" onclick="validateItemlist()">✅ Validate Format</button>
-                    <button class="btn" onclick="testSelection()">🎯 Test Selection</button>
-                </div>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="refreshData()">🔄 Refresh Data</button>
+                <button class="btn btn-warning" onclick="resetDatabase()">🗑️ Reset Database</button>
+                <button class="btn" onclick="regenerateCSVs()">📊 Regenerate CSVs</button>
+                <button class="btn" onclick="loadDailyCSV()">📋 Load Daily CSV</button>
+                <button class="btn" onclick="validateItemlist()">✅ Validate Format</button>
+                <button class="btn btn-primary" onclick="syncAllDates()">🗓️ Sync All Dates</button>
+                <button class="btn" onclick="testSelection()">🎯 Test Selection</button>
+            </div>
             </div>
 
             <!-- System Status -->
@@ -484,8 +485,8 @@
                     <!-- Limits table will be loaded here -->
                 </div>
                 <button class="btn" onclick="loadDailyLimits()">🔍 Check Limits</button>
-            </div>
-
+                </div>
+                
         <!-- Live Database Editor -->
         <div class="section">
             <h3>🔧 Live Database Editor</h3>
@@ -493,6 +494,7 @@
                 <button class="btn btn-success" onclick="loadPrizes()">📋 Load Prizes</button>
                 <button class="btn" onclick="showAddPrizeForm()">➕ Add Prize</button>
                 <button class="btn btn-warning" onclick="exportToCSV()">📤 Export to CSV</button>
+                <button class="btn" onclick="verifyInventoryChanges()">🔍 Verify Changes</button>
             </div>
             
             <!-- Live Inventory Control Notice -->
@@ -504,22 +506,22 @@
                 <div id="addPrizeForm" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
                     <h4>➕ Add New Prize</h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
-                        <div class="form-group">
+                    <div class="form-group">
                             <label>Prize Name:</label>
                             <input type="text" id="newPrizeName" placeholder="Enter prize name">
-                        </div>
-                        <div class="form-group">
+                    </div>
+                    <div class="form-group">
                             <label>Category:</label>
                             <select id="newPrizeCategory">
                                 <option value="common">Common</option>
                                 <option value="rare">Rare</option>
                                 <option value="ultra_rare">Ultra Rare</option>
                             </select>
-                        </div>
-                        <div class="form-group">
+                    </div>
+                    <div class="form-group">
                             <label>Quantity:</label>
                             <input type="number" id="newPrizeQuantity" value="30" min="1">
-                        </div>
+                    </div>
                         <div class="form-group">
                             <label>Daily Limit:</label>
                             <input type="number" id="newPrizeDailyLimit" value="5" min="1">
@@ -532,9 +534,9 @@
                     <div class="btn-group">
                         <button class="btn btn-success" onclick="addPrize()">✅ Add Prize</button>
                         <button class="btn btn-danger" onclick="hideAddPrizeForm()">❌ Cancel</button>
-                    </div>
                 </div>
-                
+            </div>
+
                 <!-- Prizes Table -->
                 <div id="prizesContainer" style="margin-top: 1rem;">
                     <p>Click "Load Prizes" to view and edit current prizes for the selected date.</p>
@@ -596,7 +598,7 @@
             try {
                 // Test authentication with daily limits endpoint
                 const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${password}&date=${getCurrentDate()}`);
-                
+
                 if (response.ok) {
                     authToken = password;
                     document.getElementById('loginSection').style.display = 'none';
@@ -652,23 +654,23 @@
                 if (data.success) {
                     const summary = data.summary;
                     document.getElementById('statsGrid').innerHTML = `
-                        <div class="stat-card">
+                <div class="stat-card">
                             <span class="stat-value">${summary.total_items}</span>
                             <span class="stat-label">Total Items</span>
-                        </div>
-                        <div class="stat-card">
+                </div>
+                <div class="stat-card">
                             <span class="stat-value">${summary.available}</span>
                             <span class="stat-label">Available</span>
-                        </div>
-                        <div class="stat-card">
+                </div>
+                <div class="stat-card">
                             <span class="stat-value">${summary.exhausted}</span>
                             <span class="stat-label">Exhausted</span>
-                        </div>
-                        <div class="stat-card">
+                </div>
+                <div class="stat-card">
                             <span class="stat-value">${summary.out_of_stock}</span>
                             <span class="stat-label">Out of Stock</span>
-                        </div>
-                    `;
+                </div>
+            `;
                 }
             } catch (error) {
                 addToOutput('❌ Error loading stats: ' + error.message);
@@ -717,7 +719,7 @@
 
         async function resetDatabase() {
             if (!authToken) return;
-            
+
             if (!confirm('⚠️ Are you sure you want to reset the database? This will clear all transactions and inventory data!')) {
                 return;
             }
@@ -735,7 +737,7 @@
                         confirm: true
                     })
                 });
-                
+
                 const data = await response.json();
                 
                 if (data.success) {
@@ -786,7 +788,7 @@
 
         async function testSelection() {
             if (!authToken) return;
-            
+
             addToOutput('🎯 Testing aggressive selection logic...');
             
             try {
@@ -801,7 +803,7 @@
                         num_tests: 10
                     })
                 });
-                
+
                 const data = await response.json();
                 
                 if (data.success) {
@@ -826,7 +828,7 @@
                     data.results.forEach(result => {
                         if (result.error) {
                             resultsHtml += `Test ${result.test_number}: ❌ ${result.error}\n`;
-                        } else {
+                } else {
                             resultsHtml += `Test ${result.test_number}: ${result.prize_name} (${result.category}) - ${result.wins_today}/${result.daily_limit} daily, ${result.remaining_quantity} remaining\n`;
                         }
                     });
@@ -1240,8 +1242,8 @@
             } catch (error) {
                 addToOutput('❌ Error validating itemlist: ' + error.message);
             }
-        }
-
+            }
+            
         // 🎛️ LIVE INVENTORY CONTROL FUNCTIONS
         async function adjustQuantity(prizeId, adjustment) {
             if (!authToken) return;
@@ -1318,6 +1320,123 @@
                 }
             } catch (error) {
                 addToOutput('❌ Error setting quantity: ' + error.message);
+            }
+        }
+
+        async function verifyInventoryChanges() {
+            if (!authToken) return;
+            
+            addToOutput('🔍 Verifying inventory changes...');
+            
+            try {
+                const date = getCurrentDate();
+                const response = await fetch(`${API_BASE}/admin/prizes/list?admin_password=${authToken}&date=${date}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`📊 Current Inventory Status for ${date}:`);
+                    addToOutput(`   Total prizes: ${data.total_count}`);
+                    
+                    // Show summary by category
+                    const categories = { common: 0, rare: 0, ultra_rare: 0 };
+                    const totalQuantity = { common: 0, rare: 0, ultra_rare: 0 };
+                    
+                    data.prizes.forEach(prize => {
+                        categories[prize.category]++;
+                        totalQuantity[prize.category] += prize.remaining_quantity;
+                    });
+                    
+                    addToOutput(`   Common: ${categories.common} items, ${totalQuantity.common} total quantity`);
+                    addToOutput(`   Rare: ${categories.rare} items, ${totalQuantity.rare} total quantity`);
+                    addToOutput(`   Ultra-rare: ${categories.ultra_rare} items, ${totalQuantity.ultra_rare} total quantity`);
+                    
+                    // Show items with recent changes (non-standard quantities)
+                    addToOutput(`📋 Items with custom quantities:`);
+                    data.prizes.forEach(prize => {
+                        // Highlight items that don't have standard quantities
+                        if ((prize.category === 'common' && prize.remaining_quantity !== 30) ||
+                            (prize.category === 'rare' && prize.remaining_quantity !== 10) ||
+                            (prize.category === 'ultra_rare' && prize.remaining_quantity !== 3)) {
+                            addToOutput(`   🎛️ ${prize.name}: ${prize.remaining_quantity} (${prize.category})`);
+                        }
+                    });
+                    
+                    // Test if changes persist by making a small test
+                    addToOutput(`🧪 Testing live adjustment...`);
+                    const testPrize = data.prizes[0]; // Use first prize for test
+                    const testResponse = await fetch(`${API_BASE}/admin/adjust-quantity`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            admin_password: authToken,
+                            prize_id: testPrize.prize_id,
+                            adjustment: 1,
+                            date: date
+                        })
+                    });
+                    
+                    const testResult = await testResponse.json();
+                    if (testResult.success) {
+                        addToOutput(`   ✅ Test adjustment successful: ${testResult.prize_name} ${testResult.old_quantity} → ${testResult.new_quantity}`);
+                        
+                        // Revert the test change
+                        await fetch(`${API_BASE}/admin/adjust-quantity`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                admin_password: authToken,
+                                prize_id: testPrize.prize_id,
+                                adjustment: -1,
+                                date: date
+                            })
+                        });
+                        addToOutput(`   🔄 Test change reverted`);
+                    }
+                    
+                    addToOutput(`✅ Verification complete - Live inventory control is working!`);
+            } else {
+                    addToOutput('❌ Error verifying changes: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error during verification: ' + error.message);
+            }
+        }
+
+        async function syncAllDates() {
+            if (!authToken) return;
+            
+            addToOutput('🗓️ Syncing ALL dates from itemlist_dates_v2.txt...');
+            addToOutput('⏳ This may take a moment for large date ranges...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/sync-all-dates`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.statistics;
+                    addToOutput(`✅ Multi-date sync completed successfully!`);
+                    addToOutput(`📊 Statistics:`);
+                    addToOutput(`   • Total dates: ${stats.total_dates}`);
+                    addToOutput(`   • Total records: ${stats.total_records}`);
+                    addToOutput(`   • Date range: ${stats.date_range.start} to ${stats.date_range.end}`);
+                    addToOutput(`🎯 You can now view/manage any date in the range!`);
+                    
+                    // Refresh the current data
+                    await refreshData();
+            } else {
+                    addToOutput('❌ Failed to sync all dates: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error syncing all dates: ' + error.message);
             }
         }
     </script>

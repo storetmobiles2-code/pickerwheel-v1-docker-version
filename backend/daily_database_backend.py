@@ -370,6 +370,103 @@ class DailyPrizeManager:
         finally:
             conn.close()
     
+    def sync_all_dates_to_database(self) -> bool:
+        """🗓️ Sync ALL dates from itemlist_dates_v2.txt to database (Multi-date support)"""
+        all_prizes = self.load_all_prizes_from_itemlist()
+        
+        # Extract all unique dates from the prizes
+        all_dates = set()
+        for prize in all_prizes:
+            if prize['available_dates'] == '*':
+                # For '*', add a range of dates (current date to Oct 30, 2025)
+                start_date = date.today()
+                end_date = date(2025, 10, 30)
+                current = start_date
+                while current <= end_date:
+                    all_dates.add(current.isoformat())
+                    current += timedelta(days=1)
+            else:
+                # Add specific dates
+                date_list = [d.strip() for d in prize['available_dates'].split('|')]
+                all_dates.update(date_list)
+        
+        logger.info(f"🗓️ Syncing {len(all_dates)} dates to database...")
+        
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            synced_dates = 0
+            for date_str in sorted(all_dates):
+                try:
+                    target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    
+                    # Check if data already exists for this date
+                    cursor.execute('SELECT COUNT(*) FROM daily_prizes WHERE date = ?', (date_str,))
+                    existing_count = cursor.fetchone()[0]
+                    
+                    if existing_count > 0:
+                        logger.debug(f"📊 Data already exists for {date_str} ({existing_count} prizes), skipping")
+                        continue
+                    
+                    # Sync this specific date
+                    for prize in all_prizes:
+                        # Determine if item is available on this date
+                        is_available = self.is_item_available_on_date(prize, target_date)
+                        
+                        # Set quantity based on availability
+                        if is_available:
+                            quantity = prize['quantity']
+                        else:
+                            quantity = 0  # Not available on this date
+                        
+                        # Insert into daily_prizes table
+                        cursor.execute('''
+                            INSERT INTO daily_prizes (date, prize_id, name, category, quantity, daily_limit, available_dates, emoji)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            date_str,
+                            prize['id'],
+                            prize['name'],
+                            prize['category'],
+                            quantity,
+                            prize['daily_limit'],
+                            prize['available_dates'],
+                            prize.get('emoji', '🎁')
+                        ))
+                        
+                        # Insert into daily_inventory table
+                        cursor.execute('''
+                            INSERT INTO daily_inventory (date, prize_id, name, initial_quantity, remaining_quantity, daily_limit)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (
+                            date_str,
+                            prize['id'],
+                            prize['name'],
+                            quantity,
+                            quantity,
+                            prize['daily_limit']
+                        ))
+                    
+                    synced_dates += 1
+                    if synced_dates % 10 == 0:  # Log progress every 10 dates
+                        logger.info(f"📊 Synced {synced_dates} dates so far...")
+                        
+                except ValueError as e:
+                    logger.warning(f"Invalid date format: {date_str}, skipping")
+                    continue
+            
+            conn.commit()
+            logger.info(f"✅ Successfully synced {synced_dates} new dates to database")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error syncing all dates to database: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+    
     def _validate_database_integrity(self, target_date: date):
         """✅ FIX: Validate database integrity and consistency"""
         date_str = target_date.isoformat()
@@ -1652,6 +1749,62 @@ def admin_validate_itemlist():
         
     except Exception as e:
         logger.error(f"Error validating itemlist: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/sync-all-dates', methods=['POST'])
+def admin_sync_all_dates():
+    """🗓️ Admin endpoint to sync ALL dates from itemlist_dates_v2.txt"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        logger.info("🗓️ Admin triggered multi-date sync")
+        
+        # Create prize manager instance
+        csv_dir = os.path.join(os.path.dirname(__file__), '..', 'daily_csvs')
+        prize_manager_instance = DailyPrizeManager(csv_dir, db_manager)
+        
+        # Sync all dates
+        success = prize_manager_instance.sync_all_dates_to_database()
+        
+        if success:
+            # Get statistics
+            conn = db_manager.get_connection()
+            cursor = conn.cursor()
+            
+            # Count total dates and prizes
+            cursor.execute('SELECT COUNT(DISTINCT date) as total_dates FROM daily_prizes')
+            total_dates = cursor.fetchone()['total_dates']
+            
+            cursor.execute('SELECT COUNT(*) as total_records FROM daily_prizes')
+            total_records = cursor.fetchone()['total_records']
+            
+            # Get date range
+            cursor.execute('SELECT MIN(date) as min_date, MAX(date) as max_date FROM daily_prizes')
+            date_range = cursor.fetchone()
+            
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'message': 'All dates synced successfully',
+                'statistics': {
+                    'total_dates': total_dates,
+                    'total_records': total_records,
+                    'date_range': {
+                        'start': date_range['min_date'],
+                        'end': date_range['max_date']
+                    }
+                }
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to sync all dates'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error in multi-date sync: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/adjust-quantity', methods=['POST'])
