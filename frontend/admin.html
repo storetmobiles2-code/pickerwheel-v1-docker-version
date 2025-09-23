@@ -478,6 +478,26 @@
                 </div>
             </div>
 
+            <!-- 🏗️ IMPROVED ARCHITECTURE: Database-First Management -->
+            <div class="section">
+                <h3>🏗️ Database-First Architecture</h3>
+                <div style="margin: 1rem 0; padding: 0.5rem; background: rgba(0,150,255,0.1); border-left: 4px solid #0096FF; border-radius: 4px;">
+                    <strong>🎯 Improved Architecture:</strong> Database is the primary source of truth. CSV files are used for export/import and master config reloading.
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="getDatabaseStatus()">📊 Database Status</button>
+                    <button class="btn btn-success" onclick="exportDateToCSV()">📤 Export to CSV</button>
+                    <button class="btn btn-warning" onclick="reloadFromMasterConfig()">🔄 Reload from Master</button>
+                    <button class="btn" onclick="reloadAllDatesFromMaster()">🗓️ Reload All Dates</button>
+                </div>
+                
+                <!-- Database Status Display -->
+                <div id="databaseStatusContainer" style="margin-top: 1rem;">
+                    <p>Click "📊 Database Status" to view comprehensive database information.</p>
+                </div>
+            </div>
+
             <!-- Daily Limits Status -->
             <div class="section">
                 <h3>⚡ Daily Limits Status</h3>
@@ -1437,6 +1457,202 @@
                 }
             } catch (error) {
                 addToOutput('❌ Error syncing all dates: ' + error.message);
+            }
+        }
+
+        // 🏗️ IMPROVED ARCHITECTURE FUNCTIONS
+        async function getDatabaseStatus() {
+            if (!authToken) return;
+            
+            addToOutput('📊 Getting comprehensive database status...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/database-status?admin_password=${authToken}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const status = data.database_status;
+                    
+                    let statusHtml = `
+                        <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                            <h4>📊 Database Overview</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
+                                <div class="stat-card">
+                                    <div class="stat-value">${status.total_dates}</div>
+                                    <div class="stat-label">Total Dates</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${status.total_records}</div>
+                                    <div class="stat-label">Total Records</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${status.transactions.total_transactions}</div>
+                                    <div class="stat-label">Total Transactions</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${status.transactions.unique_users}</div>
+                                    <div class="stat-label">Unique Users</div>
+                                </div>
+                            </div>
+                            
+                            <h5>📅 Date Range</h5>
+                            <p><strong>From:</strong> ${status.date_range.start} <strong>To:</strong> ${status.date_range.end}</p>
+                            
+                            <h5>📊 Category Distribution (Today)</h5>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem;">
+                    `;
+                    
+                    status.category_stats.forEach(cat => {
+                        statusHtml += `
+                            <div class="category-badge category-${cat.category}">
+                                ${cat.category.replace('_', ' ').toUpperCase()}: ${cat.count} items (${cat.total_quantity} total)
+                            </div>
+                        `;
+                    });
+                    
+                    statusHtml += `
+                            </div>
+                            
+                            <h5>📈 Recent Activity</h5>
+                            <div style="max-height: 150px; overflow-y: auto;">
+                    `;
+                    
+                    if (status.recent_activity.length > 0) {
+                        status.recent_activity.forEach(activity => {
+                            statusHtml += `<p>📅 ${activity.date}: ${activity.daily_wins} wins</p>`;
+                        });
+                    } else {
+                        statusHtml += '<p>No recent activity</p>';
+                    }
+                    
+                    statusHtml += `
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('databaseStatusContainer').innerHTML = statusHtml;
+                    addToOutput('✅ Database status loaded successfully');
+                } else {
+                    addToOutput('❌ Failed to get database status: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error getting database status: ' + error.message);
+            }
+        }
+
+        async function exportDateToCSV() {
+            if (!authToken) return;
+            
+            const date = getCurrentDate();
+            addToOutput(`📤 Exporting database state to CSV for ${date}...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/export-date-to-csv`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        date: date
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ Database exported to CSV for ${date}`);
+                    addToOutput(`📊 Records exported: ${data.records_exported}`);
+                    
+                    // Create downloadable CSV file
+                    const blob = new Blob([data.csv_content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `prizes_${date}_export.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    addToOutput(`💾 CSV file downloaded: prizes_${date}_export.csv`);
+                } else {
+                    addToOutput('❌ Failed to export to CSV: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error exporting to CSV: ' + error.message);
+            }
+        }
+
+        async function reloadFromMasterConfig() {
+            if (!authToken) return;
+            
+            const date = getCurrentDate();
+            addToOutput(`🔄 Reloading ${date} from master config (itemlist_dates_v2.txt)...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/reload-from-master-config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        date: date,
+                        reload_all_dates: false
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ ${data.message}`);
+                    addToOutput(`📊 Records loaded: ${data.records_loaded}`);
+                    
+                    // Refresh the current data
+                    await refreshData();
+                    await loadPrizes();
+                } else {
+                    addToOutput('❌ Failed to reload from master config: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error reloading from master config: ' + error.message);
+            }
+        }
+
+        async function reloadAllDatesFromMaster() {
+            if (!authToken) return;
+            
+            addToOutput('🗓️ Reloading ALL dates from master config...');
+            addToOutput('⏳ This may take a moment for large date ranges...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/reload-from-master-config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        admin_password: authToken,
+                        reload_all_dates: true
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToOutput(`✅ ${data.message}`);
+                    addToOutput(`📊 Total dates: ${data.total_dates}`);
+                    addToOutput(`📅 Date range: ${data.date_range.start} to ${data.date_range.end}`);
+                    
+                    // Refresh the current data
+                    await refreshData();
+                    await getDatabaseStatus();
+                } else {
+                    addToOutput('❌ Failed to reload all dates: ' + data.error);
+                }
+            } catch (error) {
+                addToOutput('❌ Error reloading all dates: ' + error.message);
             }
         }
     </script>

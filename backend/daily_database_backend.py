@@ -1947,6 +1947,243 @@ def admin_set_quantity():
         logger.error(f"Error in set quantity: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# 🏗️ IMPROVED ARCHITECTURE: Database-First with CSV Export/Import
+@app.route('/api/admin/export-date-to-csv', methods=['POST'])
+def admin_export_date_to_csv():
+    """📤 Export database state to CSV file (Database → CSV)"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = data.get('date', date.today().isoformat())
+        
+        logger.info(f"📤 Exporting database state to CSV for {target_date}")
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Get current database state with all details
+            cursor.execute('''
+                SELECT dp.prize_id as id, dp.name, dp.category, 
+                       di.remaining_quantity as quantity, dp.daily_limit, 
+                       dp.emoji, dp.available_dates,
+                       COALESCE(wins.wins_today, 0) as wins_today
+                FROM daily_prizes dp
+                JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
+                LEFT JOIN (
+                    SELECT prize_id, COUNT(*) as wins_today
+                    FROM daily_transactions 
+                    WHERE date = ? AND transaction_type = 'win'
+                    GROUP BY prize_id
+                ) wins ON dp.prize_id = wins.prize_id
+                WHERE dp.date = ?
+                ORDER BY dp.prize_id
+            ''', (target_date, target_date))
+            
+            db_data = cursor.fetchall()
+            
+            if not db_data:
+                return jsonify({'success': False, 'error': f'No data found in database for {target_date}'}), 404
+            
+            # Prepare CSV content
+            csv_content = "id,name,category,quantity,daily_limit,emoji,wins_today\n"
+            for row in db_data:
+                csv_content += f"{row['id']},{row['name']},{row['category']},{row['quantity']},{row['daily_limit']},{row['emoji'] or '🎁'},{row['wins_today']}\n"
+            
+            logger.info(f"✅ Generated CSV content for {len(db_data)} records")
+            
+            return jsonify({
+                'success': True,
+                'message': f'Database exported to CSV for {target_date}',
+                'csv_content': csv_content,
+                'records_exported': len(db_data),
+                'date': target_date
+            })
+            
+        except Exception as e:
+            logger.error(f"Error exporting database to CSV: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"Error in database to CSV export: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/reload-from-master-config', methods=['POST'])
+def admin_reload_from_master_config():
+    """🔄 Reload database from master config (itemlist_dates_v2.txt → Database)"""
+    try:
+        data = request.get_json() or {}
+        admin_password = data.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        target_date = data.get('date')
+        reload_all_dates = data.get('reload_all_dates', False)
+        
+        logger.info(f"🔄 Reloading from master config - Date: {target_date}, All dates: {reload_all_dates}")
+        
+        # Create prize manager instance
+        csv_dir = os.path.join(os.path.dirname(__file__), '..', 'daily_csvs')
+        prize_manager_instance = DailyPrizeManager(csv_dir, db_manager)
+        
+        if reload_all_dates:
+            # Reload all dates from master config
+            success = prize_manager_instance.sync_all_dates_to_database()
+            
+            if success:
+                # Get statistics
+                conn = db_manager.get_connection()
+                cursor = conn.cursor()
+                
+                cursor.execute('SELECT COUNT(DISTINCT date) as total_dates FROM daily_prizes')
+                total_dates = cursor.fetchone()['total_dates']
+                
+                cursor.execute('SELECT MIN(date) as min_date, MAX(date) as max_date FROM daily_prizes')
+                date_range = cursor.fetchone()
+                
+                conn.close()
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'All dates reloaded from master config',
+                    'total_dates': total_dates,
+                    'date_range': {
+                        'start': date_range['min_date'],
+                        'end': date_range['max_date']
+                    }
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to reload all dates'}), 500
+        
+        else:
+            # Reload specific date
+            if not target_date:
+                target_date = date.today().isoformat()
+            
+            target_date_obj = datetime.strptime(target_date, '%Y-%m-%d').date()
+            
+            # Clear existing data for this date
+            conn = db_manager.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('DELETE FROM daily_prizes WHERE date = ?', (target_date,))
+            cursor.execute('DELETE FROM daily_inventory WHERE date = ?', (target_date,))
+            conn.commit()
+            conn.close()
+            
+            # Reload from master config
+            success = prize_manager_instance.sync_all_items_to_database(target_date_obj)
+            
+            if success:
+                # Get count of reloaded items
+                conn = db_manager.get_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) as count FROM daily_prizes WHERE date = ?', (target_date,))
+                count = cursor.fetchone()['count']
+                conn.close()
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Date {target_date} reloaded from master config',
+                    'records_loaded': count,
+                    'date': target_date
+                })
+            else:
+                return jsonify({'success': False, 'error': f'Failed to reload {target_date}'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error reloading from master config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/database-status', methods=['GET'])
+def admin_database_status():
+    """📊 Get comprehensive database status (Database-first architecture)"""
+    try:
+        admin_password = request.args.get('admin_password')
+        
+        if admin_password != ADMIN_PASSWORD:
+            return jsonify({'success': False, 'error': 'Invalid admin password'}), 401
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Get overall statistics
+            cursor.execute('SELECT COUNT(DISTINCT date) as total_dates FROM daily_prizes')
+            total_dates = cursor.fetchone()['total_dates']
+            
+            cursor.execute('SELECT COUNT(*) as total_records FROM daily_prizes')
+            total_records = cursor.fetchone()['total_records']
+            
+            cursor.execute('SELECT MIN(date) as min_date, MAX(date) as max_date FROM daily_prizes')
+            date_range = cursor.fetchone()
+            
+            # Get transaction statistics
+            cursor.execute('SELECT COUNT(*) as total_transactions FROM daily_transactions')
+            total_transactions = cursor.fetchone()['total_transactions']
+            
+            cursor.execute('''
+                SELECT COUNT(DISTINCT user_identifier) as unique_users 
+                FROM daily_transactions 
+                WHERE transaction_type = 'win'
+            ''')
+            unique_users = cursor.fetchone()['unique_users']
+            
+            # Get recent activity
+            cursor.execute('''
+                SELECT date, COUNT(*) as daily_wins
+                FROM daily_transactions 
+                WHERE transaction_type = 'win'
+                GROUP BY date
+                ORDER BY date DESC
+                LIMIT 7
+            ''')
+            recent_activity = [dict(row) for row in cursor.fetchall()]
+            
+            # Get category distribution
+            cursor.execute('''
+                SELECT category, COUNT(*) as count, SUM(quantity) as total_quantity
+                FROM daily_prizes
+                WHERE date = ?
+                GROUP BY category
+            ''', (date.today().isoformat(),))
+            category_stats = [dict(row) for row in cursor.fetchall()]
+            
+            return jsonify({
+                'success': True,
+                'database_status': {
+                    'total_dates': total_dates,
+                    'total_records': total_records,
+                    'date_range': {
+                        'start': date_range['min_date'],
+                        'end': date_range['max_date']
+                    },
+                    'transactions': {
+                        'total_transactions': total_transactions,
+                        'unique_users': unique_users
+                    },
+                    'recent_activity': recent_activity,
+                    'category_stats': category_stats
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting database status: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"Error in database status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     logger.info(f"Starting Daily PickerWheel Backend with Database on port {PORT}")
     logger.info(f"Daily CSV directory: {DAILY_CSV_DIR}")
