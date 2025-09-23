@@ -673,13 +673,23 @@ class DailyPrizeManager:
                 logger.info(f"🎲 {selection_reason}: {selected_prize['name']} ({selected_prize['category']}) - "
                            f"Wins today: {selected_prize.get('wins_today', 0)}/{selected_prize['daily_limit']}, "
                            f"Remaining: {selected_prize['remaining_quantity']}")
+                
+                # 🔧 FIX: Convert SQLite Row to dict for JSON serialization
+                if hasattr(selected_prize, 'keys'):
+                    selected_prize = dict(selected_prize)
             
             return selected_prize
             
         except Exception as e:
             logger.error(f"Error in aggressive prize selection: {e}")
             # Fallback to simple random selection
-            return random.choice(available_prizes) if available_prizes else None
+            if available_prizes:
+                fallback_prize = random.choice(available_prizes)
+                # 🔧 FIX: Convert SQLite Row to dict for JSON serialization
+                if hasattr(fallback_prize, 'keys'):
+                    fallback_prize = dict(fallback_prize)
+                return fallback_prize
+            return None
         finally:
             conn.close()
     
@@ -717,9 +727,16 @@ class DailyPrizeManager:
             selected = random.choice(weighted_prizes)
             logger.debug(f"Weighted selection from {len(prizes)} {category} items: {selected['name']} "
                         f"(weight factor: {len([p for p in weighted_prizes if p['name'] == selected['name']])}/{len(weighted_prizes)})")
+            # 🔧 FIX: Convert SQLite Row to dict for JSON serialization
+            if hasattr(selected, 'keys'):
+                selected = dict(selected)
             return selected
         
-        return random.choice(prizes)
+        fallback = random.choice(prizes)
+        # 🔧 FIX: Convert SQLite Row to dict for JSON serialization
+        if hasattr(fallback, 'keys'):
+            fallback = dict(fallback)
+        return fallback
     
     def consume_prize(self, prize_id: int, prize_name: str, target_date: date, user_identifier: str) -> bool:
         """Consume a prize and record transaction"""
@@ -989,14 +1006,34 @@ def pre_spin_selection():
         logger.info(f"   Maps to wheel segment: {target_segment_index}")
         logger.info(f"   Wheel prize at segment {target_segment_index}: {all_wheel_prizes[target_segment_index]['name']}")
         
+        # 🔧 DEBUG: Check selected_prize object type and content
+        logger.info(f"🔍 DEBUG selected_prize type: {type(selected_prize)}")
+        logger.info(f"🔍 DEBUG selected_prize keys: {list(selected_prize.keys()) if hasattr(selected_prize, 'keys') else 'No keys method'}")
+        logger.info(f"🔍 DEBUG selected_prize dict conversion: {dict(selected_prize) if hasattr(selected_prize, 'keys') else selected_prize}")
+        
+        # 🔧 ENSURE CONVERSION: Force conversion to regular dict
+        if hasattr(selected_prize, 'keys'):
+            selected_prize = dict(selected_prize)
+            logger.info(f"🔧 Converted to dict: {selected_prize}")
+        
         # Verify the mapping is correct using ID
         if all_wheel_prizes[target_segment_index]['id'] != selected_prize['id']:
             logger.error(f"❌ MAPPING ERROR: Selected prize ID {selected_prize['id']} does not match wheel segment {target_segment_index} prize ID {all_wheel_prizes[target_segment_index]['id']}")
             return jsonify({'success': False, 'error': 'Prize mapping error'}), 500
         
-        return jsonify({
+        # 🔧 FINAL FIX: Create a clean response object
+        response_data = {
             'success': True,
-            'selected_prize': selected_prize,
+            'selected_prize': {
+                'id': selected_prize['id'],
+                'name': selected_prize['name'],
+                'category': selected_prize['category'],
+                'quantity': selected_prize['quantity'],
+                'daily_limit': selected_prize['daily_limit'],
+                'emoji': selected_prize['emoji'],
+                'remaining_quantity': selected_prize['remaining_quantity'],
+                'wins_today': selected_prize.get('wins_today', 0)
+            },
             'target_segment_index': target_segment_index,
             'total_segments': len(all_wheel_prizes),
             'debug_info': {
@@ -1006,7 +1043,11 @@ def pre_spin_selection():
                 'all_prize_names': [p['name'] for p in all_wheel_prizes],
                 'mapping': [(i, p['id'], p['name']) for i, p in enumerate(all_wheel_prizes)]
             }
-        })
+        }
+        
+        logger.info(f"🔧 Final response data: {response_data['selected_prize']}")
+        
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"Error in pre-spin selection: {e}")
