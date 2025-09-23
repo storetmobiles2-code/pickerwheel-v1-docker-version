@@ -2225,6 +2225,141 @@ def admin_database_status():
         logger.error(f"Error in database status: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/daily-prizes-log', methods=['GET'])
+def get_daily_prizes_log():
+    """📋 Get today's prizes won with timestamps for display table"""
+    try:
+        # Get target date (default to today)
+        target_date = request.args.get('date')
+        if target_date:
+            target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
+        else:
+            target_date = date.today()
+        
+        date_str = target_date.isoformat()
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Get today's won prizes with details
+        cursor.execute('''
+            SELECT dt.prize_id, dt.name, dt.user_identifier, dt.timestamp,
+                   dp.category, dp.emoji
+            FROM daily_transactions dt
+            JOIN daily_prizes dp ON dt.prize_id = dp.prize_id AND dt.date = dp.date
+            WHERE dt.date = ? AND dt.transaction_type = 'win'
+            ORDER BY dt.timestamp DESC
+        ''', (date_str,))
+        
+        transactions = []
+        for row in cursor.fetchall():
+            # Format timestamp for display
+            timestamp_obj = datetime.fromisoformat(row['timestamp'])
+            formatted_time = timestamp_obj.strftime('%H:%M:%S')
+            
+            transactions.append({
+                'prize_id': row['prize_id'],
+                'name': row['name'],
+                'user_identifier': row['user_identifier'][:8] + '...' if len(row['user_identifier']) > 8 else row['user_identifier'],  # Truncate for privacy
+                'timestamp': row['timestamp'],
+                'formatted_time': formatted_time,
+                'category': row['category'],
+                'emoji': row['emoji']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'date': date_str,
+            'prizes_won': transactions,
+            'total_count': len(transactions)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting daily prizes log: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/audit-log', methods=['GET'])
+def get_audit_log():
+    """📊 Get comprehensive audit log of all transactions"""
+    try:
+        # Get parameters
+        date_filter = request.args.get('date')  # Optional date filter
+        limit = int(request.args.get('limit', 100))  # Default 100 records
+        offset = int(request.args.get('offset', 0))  # For pagination
+        
+        conn = db_manager.get_connection()
+        cursor = conn.cursor()
+        
+        # Build query based on filters
+        where_clause = ""
+        params = []
+        
+        if date_filter:
+            where_clause = "WHERE dt.date = ?"
+            params.append(date_filter)
+        
+        # Get audit log with all transaction details
+        cursor.execute(f'''
+            SELECT dt.id, dt.date, dt.prize_id, dt.name, dt.user_identifier, 
+                   dt.transaction_type, dt.quantity, dt.timestamp,
+                   dp.category, dp.emoji, dp.daily_limit,
+                   di.remaining_quantity
+            FROM daily_transactions dt
+            LEFT JOIN daily_prizes dp ON dt.prize_id = dp.prize_id AND dt.date = dp.date
+            LEFT JOIN daily_inventory di ON dt.prize_id = di.prize_id AND dt.date = di.date
+            {where_clause}
+            ORDER BY dt.timestamp DESC
+            LIMIT ? OFFSET ?
+        ''', params + [limit, offset])
+        
+        audit_entries = []
+        for row in cursor.fetchall():
+            # Format timestamp
+            timestamp_obj = datetime.fromisoformat(row['timestamp'])
+            formatted_timestamp = timestamp_obj.strftime('%Y-%m-%d %H:%M:%S')
+            
+            audit_entries.append({
+                'id': row['id'],
+                'date': row['date'],
+                'prize_id': row['prize_id'],
+                'name': row['name'],
+                'user_identifier': row['user_identifier'],
+                'transaction_type': row['transaction_type'],
+                'quantity': row['quantity'],
+                'timestamp': row['timestamp'],
+                'formatted_timestamp': formatted_timestamp,
+                'category': row['category'],
+                'emoji': row['emoji'],
+                'daily_limit': row['daily_limit'],
+                'remaining_quantity': row['remaining_quantity']
+            })
+        
+        # Get total count for pagination
+        cursor.execute(f'''
+            SELECT COUNT(*) as total
+            FROM daily_transactions dt
+            {where_clause}
+        ''', params)
+        
+        total_count = cursor.fetchone()['total']
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'audit_log': audit_entries,
+            'total_count': total_count,
+            'limit': limit,
+            'offset': offset,
+            'has_more': (offset + limit) < total_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting audit log: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     logger.info(f"Starting Daily PickerWheel Backend with Database on port {PORT}")
     logger.info(f"Daily CSV directory: {DAILY_CSV_DIR}")

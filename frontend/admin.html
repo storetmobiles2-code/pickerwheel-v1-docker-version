@@ -571,10 +571,36 @@
                 </div>
             </div>
 
-            <!-- System Output -->
-            <div class="section">
-                <h3>📝 System Output</h3>
-                <div id="systemOutput" class="output-box">
+        <!-- Audit Log -->
+        <div class="section">
+            <h3>📊 Audit Log</h3>
+            <div class="btn-group">
+                <button class="btn" onclick="loadAuditLog()">📋 Load Audit Log</button>
+                <button class="btn" onclick="loadAuditLog(getCurrentDate())">📅 Today Only</button>
+                <button class="btn" onclick="exportAuditLog()">📤 Export CSV</button>
+            </div>
+            
+            <div class="audit-controls" style="margin: 1rem 0; display: none;" id="auditControls">
+                <label>Date Filter: <input type="date" id="auditDateFilter" onchange="filterAuditLog()"></label>
+                <label>Limit: 
+                    <select id="auditLimit" onchange="loadAuditLog()">
+                        <option value="50">50 records</option>
+                        <option value="100" selected>100 records</option>
+                        <option value="200">200 records</option>
+                        <option value="500">500 records</option>
+                    </select>
+                </label>
+            </div>
+            
+            <div id="auditLogContainer" style="margin-top: 1rem;">
+                <p>Click "Load Audit Log" to view transaction history.</p>
+            </div>
+        </div>
+
+        <!-- System Output -->
+        <div class="section">
+            <h3>📝 System Output</h3>
+            <div id="systemOutput" class="output-box">
                     Ready for admin operations...
                 </div>
             </div>
@@ -1654,6 +1680,178 @@
             } catch (error) {
                 addToOutput('❌ Error reloading all dates: ' + error.message);
             }
+        }
+        
+        // 📊 AUDIT LOG FUNCTIONS
+        async function loadAuditLog(dateFilter = null) {
+            addToOutput('📊 Loading audit log...');
+            
+            const limit = document.getElementById('auditLimit')?.value || 100;
+            let url = `/api/audit-log?limit=${limit}`;
+            
+            if (dateFilter) {
+                url += `&date=${dateFilter}`;
+            }
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayAuditLog(data);
+                    document.getElementById('auditControls').style.display = 'block';
+                    addToOutput(`✅ Loaded ${data.audit_log.length} audit entries`);
+                } else {
+                    addToOutput(`❌ Failed to load audit log: ${data.error}`);
+                }
+            } catch (error) {
+                addToOutput(`❌ Error loading audit log: ${error.message}`);
+            }
+        }
+        
+        function displayAuditLog(data) {
+            const container = document.getElementById('auditLogContainer');
+            
+            if (data.audit_log.length === 0) {
+                container.innerHTML = '<p>No audit entries found for the selected criteria.</p>';
+                return;
+            }
+            
+            let html = `
+                <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <strong>📊 Audit Log Summary:</strong> 
+                    ${data.audit_log.length} entries shown (Total: ${data.total_count})
+                    ${data.has_more ? ' - More records available' : ''}
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.1);">
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">🕐 Timestamp</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">📅 Date</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">🎁 Prize</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">👤 User</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">🔄 Type</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">📊 Qty</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">🏷️ Category</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">📈 Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.audit_log.forEach(entry => {
+                const userDisplay = entry.user_identifier.length > 12 
+                    ? entry.user_identifier.substring(0, 12) + '...' 
+                    : entry.user_identifier;
+                
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 0.5rem; font-family: monospace; font-size: 0.8rem;">${entry.formatted_timestamp}</td>
+                        <td style="padding: 0.5rem;">${entry.date}</td>
+                        <td style="padding: 0.5rem;">
+                            ${entry.emoji || '🎁'} ${entry.name}
+                        </td>
+                        <td style="padding: 0.5rem; font-family: monospace; font-size: 0.8rem;">${userDisplay}</td>
+                        <td style="padding: 0.5rem;">
+                            <span style="padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; background: rgba(76, 175, 80, 0.2); color: #4CAF50;">
+                                ${entry.transaction_type}
+                            </span>
+                        </td>
+                        <td style="padding: 0.5rem; text-align: center;">${entry.quantity}</td>
+                        <td style="padding: 0.5rem;">
+                            <span style="padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; ${getCategoryStyle(entry.category)}">
+                                ${entry.category ? entry.category.replace('_', ' ') : 'N/A'}
+                            </span>
+                        </td>
+                        <td style="padding: 0.5rem; text-align: center;">${entry.remaining_quantity || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        function getCategoryStyle(category) {
+            if (!category) return 'background: rgba(128,128,128,0.2); color: #888;';
+            
+            switch(category.toLowerCase()) {
+                case 'common':
+                    return 'background: rgba(76, 175, 80, 0.2); color: #4CAF50;';
+                case 'rare':
+                    return 'background: rgba(255, 193, 7, 0.2); color: #FFC107;';
+                case 'ultra_rare':
+                    return 'background: rgba(156, 39, 176, 0.2); color: #9C27B0;';
+                default:
+                    return 'background: rgba(128,128,128,0.2); color: #888;';
+            }
+        }
+        
+        function filterAuditLog() {
+            const dateFilter = document.getElementById('auditDateFilter').value;
+            loadAuditLog(dateFilter);
+        }
+        
+        async function exportAuditLog() {
+            addToOutput('📤 Exporting audit log to CSV...');
+            
+            const dateFilter = document.getElementById('auditDateFilter')?.value;
+            let url = '/api/audit-log?limit=1000'; // Get more records for export
+            
+            if (dateFilter) {
+                url += `&date=${dateFilter}`;
+            }
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    downloadAuditCSV(data.audit_log);
+                    addToOutput(`✅ Exported ${data.audit_log.length} audit entries to CSV`);
+                } else {
+                    addToOutput(`❌ Failed to export audit log: ${data.error}`);
+                }
+            } catch (error) {
+                addToOutput(`❌ Error exporting audit log: ${error.message}`);
+            }
+        }
+        
+        function downloadAuditCSV(auditData) {
+            const headers = ['Timestamp', 'Date', 'Prize ID', 'Prize Name', 'User', 'Transaction Type', 'Quantity', 'Category', 'Remaining Quantity'];
+            
+            let csvContent = headers.join(',') + '\\n';
+            
+            auditData.forEach(entry => {
+                const row = [
+                    entry.formatted_timestamp,
+                    entry.date,
+                    entry.prize_id,
+                    `"${entry.name}"`, // Quote prize names in case they contain commas
+                    entry.user_identifier,
+                    entry.transaction_type,
+                    entry.quantity,
+                    entry.category || 'N/A',
+                    entry.remaining_quantity || 'N/A'
+                ];
+                csvContent += row.join(',') + '\\n';
+            });
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `audit_log_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
