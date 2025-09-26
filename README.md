@@ -51,6 +51,8 @@ docker-manager.bat stop
 ./scripts/docker.sh status    # Check container status
 ./scripts/docker.sh logs      # View application logs
 ./scripts/docker.sh info      # Show system information
+./scripts/docker.sh test      # Run system tests
+./scripts/docker.sh clean     # Clean Docker resources
 ```
 
 ### **Docker Management (Windows)**
@@ -252,9 +254,8 @@ The application is accessible from other devices on the same network:
 
 ### **Reset Everything**
 ```bash
-./scripts/docker.sh stop
-docker system prune -f
-./scripts/docker.sh start
+./scripts/docker.sh clean    # Clean all Docker resources
+./scripts/docker.sh start    # Start fresh
 ```
 
 ### **Get System Information**

@@ -3,26 +3,26 @@ Item,Category,Quantity,Daily Limit,Available Dates
 # Common Items
 smartwatch + mini cooler,Common,30,5,*
 power bank + neckband,Common,30,5,*
-luggage bags,Common,30,5,*
-Free pouch and screen guard,Common,30,5,*
-Dinner Set,Common,30,5,*
+luggage bags,Common,5,1,*
+Free pouch and screen guard,Common,30,2,*
+Dinner Set,Common,30,3,*
 Earbuds and G.Speaker,Common,30,5,*
 
 # Rare Items
 jio tab,Rare,2,1,2025-10-02|2025-10-07|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28
-intex home theatre,Rare,4,1,*
-zebronics home theatre,Rare,6,1,2025-09-24|2025-10-04|2025-10-19|2025-10-20|2025-10-21|2025-10-23
-Mi smart speaker,Rare,1,1,2025-10-02
-zebronics astra BT speaker,Rare,9,1,*
+intex home theatre,Rare,4,1,2025-09-23
+zebronics home theatre,Rare,6,1,2025-09-24|2025-10-04|2025-10-21|2025-10-23
+Mi smart speaker,Rare,1,1,2025-09-23
+zebronics astra BT speaker,Rare,9,1,2025-10-01|2025-10-02|2025-10-21
 boult 60w soundbar,Rare,6,1,2025-09-30|2025-10-02|2025-10-19|2025-10-20|2025-10-21|2025-10-22
 gas stove,Rare,3,1,2025-09-23|2025-10-02|2025-10-18
 Mixer Grinder,Rare,6,1,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20
-pressure cooker,Common,5,1,*
+pressure cooker,Rare,5,1,2025-09-29|2025-10-02|2025-10-21
 
 # Ultra Rare Items
 Smart Tv 32 inches,Ultra Rare,1,1,2025-10-20
 silver coin,Ultra Rare,2,1,2025-09-22|2025-10-01|2025-10-21
 refrigerator,Ultra Rare,1,1,2025-10-02
-washing machine,Ultra Rare,3,1,2025-09-28|2025-10-20|2025-10-21
+washing machine,Ultra Rare,3,1,2025-09-28|2025-10-20
 aircooler,Ultra Rare,2,1,2025-10-01|2025-10-21
-Budget Smartphone,Ultra Rare,1,1,2025-10-02
+Budget Smartphone,Ultra Rare,1,1,2025-09-23
