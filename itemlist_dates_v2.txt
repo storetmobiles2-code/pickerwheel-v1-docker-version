@@ -8,7 +8,7 @@
 # Common Items (ID: 1-6)
 1,smartwatch + mini cooler,common,5,1,*,⌚,Smartwatch with mini cooler combo
 2,power bank + neckband,common,30,5,*,🔋,Power bank with neckband combo
-3,luggage bags,common,5,2,*,🧳,Travel luggage bags
+3,luggage bags,common,0,0,*,🧳,Travel luggage bags
 4,Free pouch and screen guard,common,10,3,*,📱,Free pouch and screen guard
 5,Dinner Set,common,10,4,*,🍽️,Complete dinner set
 6,Earbuds and G.Speaker,common,5,1,*,🎧,Earbuds and gaming speaker combo

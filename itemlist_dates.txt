@@ -3,7 +3,7 @@ Item,Category,Quantity,Daily Limit,Available Dates
 # Common Items
 smartwatch + mini cooler,Common,5,1,*
 power bank + neckband,Common,30,5,*
-luggage bags,Common,5,2,*
+luggage bags,Common,0,0,*
 Free pouch and screen guard,Common,10,3,*
 Dinner Set,Common,10,4,*
 Earbuds and G.Speaker,Common,5,1,*
