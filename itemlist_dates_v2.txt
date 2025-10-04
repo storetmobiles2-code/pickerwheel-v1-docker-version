@@ -15,11 +15,11 @@
 
 
 # Rare Items (ID: 7-14)
-7,jio tab,common,2,1,2025-10-01|2025-10-02|2025-10-07|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28,📱,Jio tablet
+7,jio tab,common,2,1,2025-10-01|2025-10-02|2025-10-06|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28,📱,Jio tablet
 8,intex home theatre,common,4,1,2025-09-23,🎵,Intex home theatre system
 9,zebronics home theatre,common,6,1,2025-09-24|2025-10-04|2025-10-21|2025-10-23,🎵,Zebronics home theatre system
-10,Mi smart speaker,common,1,1,2025-09-23,🔊,Mi smart speaker
-11,zebronics astra BT speaker,common,9,1,2025-09-30|2025-10-01|2025-10-02|2025-10-21,🔊,Zebronics Astra Bluetooth speaker
+10,Mi smart speaker,common,1,1,2025-10-10,🔊,Mi smart speaker
+11,zebronics astra BT speaker,common,9,1,*,🔊,Zebronics Astra Bluetooth speaker
 12,boult 60w soundbar,common,6,1,2025-09-30|2025-10-01|2025-10-02|2025-10-19|2025-10-20|2025-10-21|2025-10-22,🔊,Boult 60W soundbar
 13,gas stove,common,3,1,2025-09-23|2025-10-02|2025-10-18,🔥,Gas stove
 14,Mixer Grinder,common,6,1,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20,⚡,Mixer grinder
