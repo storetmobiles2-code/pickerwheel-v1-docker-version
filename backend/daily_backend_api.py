@@ -60,13 +60,21 @@ class DailyPrizeManager:
                     if not row.get('Item', '').strip():
                         continue
                         
+                    # Get available dates from CSV (new column)
+                    available_dates = row.get('Available_Dates', '*').strip()
+                    
+                    # Check if item is available today
+                    is_available_today = self._is_available_on_date(available_dates, target_date)
+                    
                     prize = {
                         'id': i + 1,  # Simple ID based on row number
                         'name': row['Item'].strip(),
                         'category': row['Category'].strip().lower().replace(' ', '_'),
                         'quantity': int(row['Quantity']) if row['Quantity'].isdigit() else 0,
                         'daily_limit': int(row['Daily Limit']) if row['Daily Limit'].isdigit() else 1,
-                        'emoji': self._get_emoji_for_prize(row['Item']),
+                        'emoji': row.get('Emoji', self._get_emoji_for_prize(row['Item'])).strip(),
+                        'available_dates': available_dates,
+                        'available_today': is_available_today,
                         'available_date': date_str
                     }
                     prizes.append(prize)
@@ -81,6 +89,16 @@ class DailyPrizeManager:
         except Exception as e:
             logger.error(f"Error loading daily CSV: {e}")
             return []
+    
+    def _is_available_on_date(self, available_dates: str, target_date: date) -> bool:
+        """Check if an item is available on a specific date"""
+        # If '*', available on all dates
+        if available_dates == '*':
+            return True
+        
+        # Check specific dates
+        date_str = target_date.isoformat()
+        return date_str in available_dates.split('|')
     
     def _get_emoji_for_prize(self, name: str) -> str:
         """Get appropriate emoji for prize based on name"""
@@ -135,11 +153,16 @@ class DailyPrizeManager:
         available_prizes = []
         
         for prize in prizes:
+            # Check if prize is available today (date restriction for rare items)
+            if not prize.get('available_today', True):
+                continue  # Skip prizes not available today
+            
             # Check if prize has reached daily limit
             prize_id = prize['id']
             daily_wins = self.daily_wins.get(prize_id, 0)
             
             if daily_wins < prize['daily_limit']:
+                prize['can_win'] = True
                 available_prizes.append(prize)
                 
         return available_prizes
@@ -221,7 +244,7 @@ def serve_static(filename):
 
 @app.route('/api/prizes/wheel-display')
 def get_wheel_display_prizes():
-    """Get all prizes for wheel display (for current date)"""
+    """Get all prizes for wheel display (for current date) - deduplicated"""
     try:
         target_date = request.args.get('date')
         if target_date:
@@ -229,12 +252,42 @@ def get_wheel_display_prizes():
         else:
             target_date = date.today()
             
+        # Load all prizes (including those not available today)
         prizes = prize_manager.load_daily_prizes(target_date)
+        
+        # Mark which items can actually be won today
+        for prize in prizes:
+            prize['can_win_today'] = prize.get('available_today', True)
+        
+        # Deduplicate prizes by name (case-insensitive)
+        # Keep common items preferentially, as they're always available
+        seen_names = {}
+        deduplicated_prizes = []
+        
+        # First pass: add common items
+        for prize in prizes:
+            if prize['category'] == 'common':
+                key = prize['name'].lower().strip()
+                if key not in seen_names:
+                    seen_names[key] = True
+                    deduplicated_prizes.append(prize)
+        
+        # Second pass: add rare items only if not already present
+        for prize in prizes:
+            if prize['category'] == 'rare':
+                key = prize['name'].lower().strip()
+                if key not in seen_names:
+                    seen_names[key] = True
+                    deduplicated_prizes.append(prize)
+        
+        logger.info(f"Deduplicated prizes: {len(prizes)} → {len(deduplicated_prizes)} unique items")
         
         return jsonify({
             'success': True,
-            'prizes': prizes,
-            'date': target_date.isoformat()
+            'prizes': deduplicated_prizes,
+            'date': target_date.isoformat(),
+            'total_items': len(deduplicated_prizes),
+            'original_count': len(prizes)
         })
         
     except Exception as e:
@@ -289,11 +342,39 @@ def spin_wheel():
         # Consume the prize
         prize_manager.consume_prize(selected_prize['id'])
         
-        # Calculate wheel position (simple mapping)
-        available_prizes = prize_manager.get_available_prizes(target_date)
-        sector_index = available_prizes.index(selected_prize)
-        sector_angle = 360 / len(available_prizes)
+        # Calculate wheel position based on DEDUPLICATED prizes (must match wheel display)
+        all_prizes = prize_manager.load_daily_prizes(target_date)
+        
+        # Deduplicate the same way as wheel-display endpoint
+        seen_names = {}
+        deduplicated_prizes = []
+        
+        # First pass: add common items
+        for prize in all_prizes:
+            if prize['category'] == 'common':
+                key = prize['name'].lower().strip()
+                if key not in seen_names:
+                    seen_names[key] = True
+                    deduplicated_prizes.append(prize)
+        
+        # Second pass: add rare items only if not already present
+        for prize in all_prizes:
+            if prize['category'] == 'rare':
+                key = prize['name'].lower().strip()
+                if key not in seen_names:
+                    seen_names[key] = True
+                    deduplicated_prizes.append(prize)
+        
+        # Find the selected prize in deduplicated list by name (case-insensitive)
+        selected_name = selected_prize['name'].lower().strip()
+        sector_index = next((i for i, p in enumerate(deduplicated_prizes) 
+                           if p['name'].lower().strip() == selected_name), 0)
+        
+        sector_angle = 360 / len(deduplicated_prizes)
         sector_center = sector_index * sector_angle + (sector_angle / 2)
+        
+        logger.info(f"Sector calculation: {len(all_prizes)} total → {len(deduplicated_prizes)} unique, " 
+                   f"prize '{selected_prize['name']}' at sector {sector_index}")
         
         logger.info(f"User {user_identifier} won {selected_prize['name']} on {target_date}")
         

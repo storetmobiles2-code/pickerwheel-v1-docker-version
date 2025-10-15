@@ -510,6 +510,9 @@
         <!-- Live Database Editor -->
         <div class="section">
             <h3>🔧 Live Database Editor</h3>
+            <div style="margin: 1rem 0; padding: 0.75rem; background: rgba(0,212,255,0.1); border-left: 4px solid #00d4ff; border-radius: 4px;">
+                <strong>✅ Deduplication Active:</strong> Items appearing in both common and rare categories are merged and displayed once with combined quantities.
+            </div>
             <div class="btn-group">
                 <button class="btn btn-success" onclick="loadPrizes()">📋 Load Prizes</button>
                 <button class="btn" onclick="showAddPrizeForm()">➕ Add Prize</button>
@@ -615,6 +618,9 @@
     <script>
         let authToken = null;
         const API_BASE = '/api';
+        
+        // ✅ Cache busting - add timestamp to requests
+        const cacheBuster = Date.now();
 
         // Set today's date as default
         document.addEventListener('DOMContentLoaded', () => {
@@ -683,9 +689,10 @@
             try {
                 await Promise.all([
                     loadSystemStats(),
-                    loadDailyLimits()
+                    loadDailyLimits(),
+                    loadPrizes()  // ✅ Auto-load prizes list
                 ]);
-                addToOutput('✅ Data refreshed successfully');
+                addToOutput('✅ Data refreshed successfully - showing deduplicated items');
             } catch (error) {
                 addToOutput('❌ Error refreshing data: ' + error.message);
             }

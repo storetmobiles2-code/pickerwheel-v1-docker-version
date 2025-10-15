@@ -517,18 +517,31 @@ class PickerWheelUI {
 
     async loadAvailablePrizes() {
         try {
-            console.log('📦 Loading all prizes for wheel display...');
+            console.log('📦 Loading unique prizes for wheel display...');
             
-            const response = await fetch(`${this.apiBaseUrl}/prizes/wheel-display`);
+            // Add cache buster to force fresh data
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`${this.apiBaseUrl}/prizes/wheel-display?t=${cacheBuster}`, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
             const data = await response.json();
             
             if (!data.success) {
                 throw new Error(data.error || 'Failed to load prizes');
             }
             
-            this.availablePrizes = data.prizes;
-            console.log(`✅ Loaded ${this.availablePrizes.length} prizes for wheel display`);
-            console.log('All wheel prizes (ordered by ID):', this.availablePrizes.map((p, i) => `Segment ${i}: ID ${p.id} - ${p.name}`));
+            this.availablePrizes = data.prizes || [];
+            
+            console.log(`✅ Loaded ${this.availablePrizes.length} unique prizes (deduplicated by backend)`);
+            if (data.original_count) {
+                console.log(`   (Original: ${data.original_count} items → Unique: ${this.availablePrizes.length})`);
+            }
+            console.log('Wheel prizes:', this.availablePrizes.map((p, i) => `${i + 1}. ${p.name} (${p.category})`));
             
         } catch (error) {
             console.error('❌ Failed to load prizes:', error);
