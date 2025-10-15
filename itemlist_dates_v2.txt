@@ -1,34 +1,26 @@
-# PickerWheel Item Configuration File v2.0
-# Format: ID,Item Name,Category,Quantity,Daily Limit,Available Dates,Emoji,Description
-# Categories: common, rare, common
-# Available Dates: * (all days) or specific dates separated by |
-# Emoji: Optional emoji for display
-# Description: Optional description
+Item,Category,Quantity,Daily Limit,Available Dates
 
-# Common Items (ID: 1-6)
-1,smartwatch + mini cooler,common,5,1,*,⌚,Smartwatch with mini cooler combo
-2,power bank + neckband,common,30,5,*,🔋,Power bank with neckband combo
-3,luggage bags,common,0,0,*,🧳,Travel luggage bags
-4,Free pouch and screen guard,common,10,3,*,📱,Free pouch and screen guard
-5,Dinner Set,common,10,4,*,🍽️,Complete dinner set
-6,Earbuds and G.Speaker,common,5,1,*,🎧,Earbuds and gaming speaker combo
+# Common Items
+luggage bag,Common,20,3,*
+defy buds + screen guard,Common,20,3,*
+power bank + neckband,Common,30,5,*
+dinner set,Common,20,4,*
+pressure cooker,Common,15,3,*
+zebronics bt astra speaker,Common,15,2,*
+SKULL CANDY EARPHONES + SELIE STICK,Common,20,3,*
+FREE POUCH AND SCREEN GUARD,Common,20,3,*
+Boat smartwatch,Common,15,2,*
 
-
-# Rare Items (ID: 7-14)
-7,jio tab,common,2,1,2025-10-01|2025-10-02|2025-10-06|2025-10-14|2025-10-19|2025-10-20|2025-10-21|2025-10-22|2025-10-28,📱,Jio tablet
-8,intex home theatre,common,4,1,2025-09-23,🎵,Intex home theatre system
-9,zebronics home theatre,common,6,1,2025-09-24|2025-10-04|2025-10-21|2025-10-23,🎵,Zebronics home theatre system
-10,Mi smart speaker,common,1,1,2025-10-10,🔊,Mi smart speaker
-11,zebronics astra BT speaker,common,9,1,*,🔊,Zebronics Astra Bluetooth speaker
-12,boult 60w soundbar,common,6,1,2025-09-30|2025-10-01|2025-10-02|2025-10-19|2025-10-20|2025-10-21|2025-10-22,🔊,Boult 60W soundbar
-13,gas stove,common,3,1,2025-09-23|2025-10-02|2025-10-18,🔥,Gas stove
-14,Mixer Grinder,common,6,1,2025-09-22|2025-09-29|2025-10-01|2025-10-02|2025-10-18|2025-10-20,⚡,Mixer grinder
-15,pressure cooker,common,5,1,2025-09-29|2025-09-30|2025-10-01|2025-10-02|2025-10-21,🍲,Pressure cooker
-
-# Ultra Rare Items (ID: 16-21)
-16,Smart Tv 32 inches,common,1,1,2025-10-20,📺,32 inch Smart TV
-17,silver coin,common,2,1,2025-09-22|2025-10-21,🪙,Silver coin
-18,refrigerator,common,1,1,2025-10-02,❄️,Refrigerator
-19,washing machine,common,3,1,2025-09-28|2025-10-20,🧺,Washing machine
-20,aircooler,common,2,1,2025-10-21,🌬️,Air cooler
-21,Budget Smartphone,common,1,1,2025-09-23,📱,Budget smartphone
+# Rare Items
+JIO TAB,Common,2,1,2025-10-20
+INTEX HOME THEATRE,Common,2,1,2025-10-21
+ZEBRONICS HOME THEATRE,Common,2,1,2025-10-22
+MI SMART SPEAKER,Common,2,1,2025-10-23
+SMART TV 32 INCHES,Common,1,1,2025-10-25
+SILVER COIN,Common,2,1,2025-10-27
+REFRIGERATOR,Common,1,1,2025-10-28
+WASHING MACHINE,Common,1,1,2025-10-29
+AIR COOLER,Common,2,1,2025-10-30
+BOULT 60W SOUNDBAR,Common,2,1,2025-10-31
+GAS STOVE,Common,2,1,2025-11-02
+MIXER GRINDER,Common,3,1,2025-11-03

@@ -2365,11 +2365,15 @@ if __name__ == '__main__':
     logger.info(f"Daily CSV directory: {DAILY_CSV_DIR}")
     logger.info(f"Database path: {DATABASE_PATH}")
     
-    # Test loading today's prizes
+    # Initialize database with all prizes from itemlist_dates.txt
     try:
-        today_prizes = prize_manager.sync_daily_prizes_to_database(date.today())
-        logger.info(f"Synced daily prizes for today: {today_prizes}")
+        today = date.today()
+        success = prize_manager.sync_all_items_to_database(today)
+        if success:
+            logger.info(f"✅ Synced all prizes to database for {today}")
+        else:
+            logger.warning(f"⚠️  Failed to sync prizes for {today}")
     except Exception as e:
-        logger.error(f"Failed to sync today's prizes: {e}")
+        logger.error(f"Failed to sync prizes: {e}")
     
     app.run(host='0.0.0.0', port=PORT, debug=True)

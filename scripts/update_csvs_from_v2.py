@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Update CSV files from itemlist_dates_v2.txt
+[DEPRECATED] Update CSV files from itemlist_dates_v2.txt
 Regenerates all daily CSV files with updated quantities and daily limits
+
+⚠️  DEPRECATED: Please use validate_and_update_prizes.py instead
+    This script is kept for backward compatibility only.
+    
+    Use: python3 scripts/validate_and_update_prizes.py
 """
 
 import csv
