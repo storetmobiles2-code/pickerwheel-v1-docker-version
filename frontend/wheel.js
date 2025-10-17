@@ -67,8 +67,8 @@ class PickerWheelUI {
             return {
                 wheelSize: Math.min(window.innerWidth * 0.9, 450), // 90% of screen width, max 450px
                 fontSize: {
-                    emoji: '16px',
-                    text: '11px',
+                    emoji: '18px',
+                    text: '12px',
                     modal: '4rem'
                 },
                 spinButton: '60px'
@@ -77,8 +77,8 @@ class PickerWheelUI {
             return {
                 wheelSize: 400,
                 fontSize: {
-                    emoji: '14px',
-                    text: '10px',
+                    emoji: '16px',
+                    text: '11px',
                     modal: '3rem'
                 },
                 spinButton: '50px'
@@ -871,11 +871,26 @@ class PickerWheelUI {
             'intex home theatre': 'Intex\nTheatre',
             'zebronics home theatre': 'Zebronics\nTheatre',
             'zebronics astra bt speaker': 'Zebronics\nBT Speaker',
+            'zebronics bt astra speaker': 'Zebronics\nBT Speaker',
             'smart tv 32 inches': 'Smart TV\n32"',
             'boult 60w soundbar': 'Boult\nSoundbar',
             'free pouch and screen guard': 'Pouch +\nGuard',
             'trimmer + skull candy earphones': 'Trimmer +\nEarphones',
-            'powerbank + wired earphones': 'PowerBank\n+ Earphones'
+            'skull candy earphones + selie stick': 'Skull Candy\n+ Stick',
+            'powerbank + wired earphones': 'PowerBank\n+ Earphones',
+            'massage gun': 'Massage\nGun',
+            'defy buds + screen guard': 'Defy Buds\n+ Guard',
+            'dinner set': 'Dinner\nSet',
+            'pressure cooker': 'Pressure\nCooker',
+            'boat smartwatch': 'Boat\nSmartwatch',
+            'silver coin': 'Silver\nCoin',
+            'washing machine': 'Washing\nMachine',
+            'air cooler': 'Air\nCooler',
+            'mixer grinder': 'Mixer\nGrinder',
+            'gas stove': 'Gas\nStove',
+            'luggage bag': 'Luggage\nBag',
+            'jio tab': 'Jio\nTab',
+            'mi smart speaker': 'Mi\nSpeaker'
         };
         
         const lowerName = name.toLowerCase();
@@ -911,13 +926,21 @@ class PickerWheelUI {
             'intex home theatre': 'Intex Theatre',
             'zebronics home theatre': 'Zebronics Theatre',
             'zebronics astra bt speaker': 'Zebronics BT Speaker',
+            'zebronics bt astra speaker': 'Zebronics BT Speaker',
             'smart tv 32 inches': 'Smart TV 32"',
             'boult 60w soundbar': 'Boult Soundbar',
             'free pouch and screen guard': 'Pouch + Guard',
             'trimmer + skull candy earphones': 'Trimmer + Earphones',
+            'skull candy earphones + selie stick': 'Skull Candy + Stick',
             'powerbank + wired earphones': 'PowerBank + Earphones',
             'mi smart speaker': 'Mi Speaker',
-            'budget smartphone': 'Budget Phone'
+            'budget smartphone': 'Budget Phone',
+            'massage gun': 'Massage Gun',
+            'defy buds + screen guard': 'Defy Buds + Guard',
+            'boat smartwatch': 'Boat Smartwatch',
+            'pressure cooker': 'Pressure Cooker',
+            'washing machine': 'Washing Machine',
+            'mixer grinder': 'Mixer Grinder'
         };
         
         const lowerName = name.toLowerCase();
@@ -945,10 +968,10 @@ class PickerWheelUI {
     
     formatPrizeNameForTwoLines(name) {
         // Format name for two-line radial display to prevent cropping
-        const maxLineLength = 12; // Adjust based on available space
+        const maxLineLength = 14; // Increased for better readability
         
-        // Use smart abbreviations first
-        if (name.length > 20) {
+        // Use smart abbreviations first for very long names
+        if (name.length > 25) {
             name = this.abbreviatePrizeNameRadial(name);
         }
         
@@ -970,7 +993,7 @@ class PickerWheelUI {
                 const secondLine = words.slice(mid).join(' ');
                 
                 // Ensure neither line is too long
-                if (firstLine.length > maxLineLength || secondLine.length > maxLineLength) {
+                if (firstLine.length > maxLineLength + 2 || secondLine.length > maxLineLength + 2) {
                     // Fallback: just use first word + "..."
                     return `${words[0]}\n${words[1] || '...'}`;
                 }
@@ -997,10 +1020,11 @@ class PickerWheelUI {
     }
 
     getPrizeColor(category, index) {
+        // Festive warm color palette to match the special offer theme
         const colors = {
             'ultra_rare': ['#FFD700', '#FF6B35', '#C41E3A', '#9B59B6', '#E74C3C', '#F39C12'],
-            'rare': ['#FF6B6B', '#5F27CD', '#00D2D3', '#2ECC71', '#E67E22', '#3498DB'],
-            'common': ['#4ECDC4', '#A8E6CF', '#FFD93D', '#95A5A6', '#1ABC9C', '#F1C40F']
+            'rare': ['#FF6B35', '#E74C3C', '#F39C12', '#D35400', '#C0392B', '#FF8C42'],
+            'common': ['#FF6B35', '#F39C12', '#E74C3C', '#F1C40F', '#E67E22', '#FF8C42', '#FFA07A', '#FFB84D', '#FF7F50', '#FFA500']
         };
         
         const categoryColors = colors[category] || colors.common;

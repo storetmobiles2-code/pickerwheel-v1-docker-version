@@ -1,5 +1,5 @@
-/* Main Styles for PickerWheel Contest - v11.4_20250922 */
-/* Extracted and adapted from original system */
+/* Special Offer Theme - v13.0 Premium Edition */
+/* myT MOBILES - Spin & Win Contest */
 
 * {
     margin: 0;
@@ -9,14 +9,23 @@
 
 body {
     font-family: 'Poppins', 'Inter', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* Premium warm gradient for special offers */
+    background: linear-gradient(135deg, #e8505b 0%, #f39c12 25%, #d35400 50%, #8e44ad 75%, #e8505b 100%);
+    background-size: 400% 400%;
+    animation: premiumGradient 15s ease infinite;
     min-height: 100vh;
-    overflow-x: auto; /* Allow horizontal scrolling if needed to prevent cropping */
+    overflow-x: auto;
     overflow-y: auto;
     position: relative;
     color: #ffffff;
     width: 100%;
     max-width: 100vw;
+}
+
+@keyframes premiumGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 /* Background Elements */
@@ -32,9 +41,10 @@ body {
 
 .floating-element {
     position: absolute;
-    font-size: 2rem;
-    opacity: 0.1;
-    animation: float 6s ease-in-out infinite;
+    font-size: 2.5rem;
+    opacity: 0.15;
+    animation: smoothFloat 8s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(232, 80, 91, 0.4));
 }
 
 .floating-element:nth-child(1) {
@@ -44,35 +54,55 @@ body {
 }
 
 .floating-element:nth-child(2) {
-    top: 20%;
+    top: 15%;
     right: 15%;
     animation-delay: 1s;
 }
 
 .floating-element:nth-child(3) {
-    bottom: 30%;
+    bottom: 35%;
     left: 20%;
     animation-delay: 2s;
 }
 
 .floating-element:nth-child(4) {
-    bottom: 20%;
+    bottom: 25%;
     right: 10%;
     animation-delay: 3s;
 }
 
 .floating-element:nth-child(5) {
-    top: 50%;
-    left: 5%;
+    top: 55%;
+    left: 8%;
     animation-delay: 4s;
 }
 
-@keyframes float {
+.floating-element:nth-child(6) {
+    top: 40%;
+    right: 12%;
+    animation-delay: 2.5s;
+}
+
+.floating-element:nth-child(7) {
+    bottom: 15%;
+    left: 25%;
+    animation-delay: 5s;
+}
+
+.floating-element:nth-child(8) {
+    top: 70%;
+    right: 20%;
+    animation-delay: 6s;
+}
+
+@keyframes smoothFloat {
     0%, 100% {
-        transform: translateY(0px) rotate(0deg);
+        transform: translateY(0px) rotate(0deg) scale(1);
+        opacity: 0.15;
     }
     50% {
-        transform: translateY(-20px) rotate(180deg);
+        transform: translateY(-30px) rotate(180deg) scale(1.2);
+        opacity: 0.25;
     }
 }
 
@@ -132,17 +162,19 @@ body {
 .main-title {
     font-size: 2.5rem;
     font-weight: 900;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+    /* Premium gradient for special offers */
+    background: linear-gradient(45deg, #f39c12, #e74c3c, #d35400, #f1c40f, #f39c12);
     background-size: 400% 400%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: gradientShift 4s ease-in-out infinite;
-    text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+    animation: premiumTitleShift 3s ease-in-out infinite;
+    text-shadow: none;
     margin-bottom: 10px;
+    filter: drop-shadow(0 0 10px rgba(243, 156, 18, 0.3));
 }
 
-@keyframes gradientShift {
+@keyframes premiumTitleShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
@@ -150,9 +182,36 @@ body {
 
 .subtitle {
     font-size: 1.2rem;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 300;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 1);
+    font-weight: 400;
+    text-shadow: 0 2px 15px rgba(232, 80, 91, 0.5), 0 0 20px rgba(243, 156, 18, 0.3);
+    margin-bottom: 5px;
+}
+
+/* Special offer period banner */
+.offer-period {
+    font-size: 0.95rem;
+    color: #f1c40f;
+    font-weight: 600;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    background: rgba(232, 80, 91, 0.2);
+    padding: 8px 20px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-top: 0.5rem;
+    border: 2px solid rgba(243, 156, 18, 0.3);
+    animation: subtlePulse 2s ease-in-out infinite;
+}
+
+@keyframes subtlePulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(243, 156, 18, 0.3);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+    }
 }
 
 /* Control Buttons */
