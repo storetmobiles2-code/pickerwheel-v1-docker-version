@@ -701,7 +701,15 @@
         async function loadSystemStats() {
             try {
                 const date = getCurrentDate();
-                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}`);
+                const cacheBuster = new Date().getTime();
+                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}&_t=${cacheBuster}`, {
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -733,7 +741,15 @@
         async function loadDailyLimits() {
             try {
                 const date = getCurrentDate();
-                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}`);
+                const cacheBuster = new Date().getTime();
+                const response = await fetch(`${API_BASE}/admin/daily-limits-status?admin_password=${authToken}&date=${date}&_t=${cacheBuster}`, {
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -764,6 +780,7 @@
                         </table>
                     `;
                     document.getElementById('limitsContainer').innerHTML = limitsHtml;
+                    addToOutput(`✅ Loaded daily limits - ${data.limits_status.length} items`);
                 }
             } catch (error) {
                 addToOutput('❌ Error loading daily limits: ' + error.message);
@@ -928,7 +945,15 @@
             
             try {
                 const date = getCurrentDate();
-                const response = await fetch(`${API_BASE}/admin/prizes/list?admin_password=${authToken}&date=${date}`);
+                const cacheBuster = new Date().getTime();
+                const response = await fetch(`${API_BASE}/admin/prizes/list?admin_password=${authToken}&date=${date}&_t=${cacheBuster}`, {
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.success) {
