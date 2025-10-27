@@ -254,13 +254,13 @@ class DailyPrizeManager:
             # First, sync all items to database
             self.sync_all_items_to_database(target_date)
             
-            # Get all prizes from database (ONLY items with quantity > 0 that are available on this date)
+            # Get all prizes from database (including those with 0 quantity)
             cursor.execute('''
                 SELECT dp.prize_id as id, dp.name, dp.category, dp.quantity, dp.daily_limit, 
                        dp.available_dates, dp.emoji, di.remaining_quantity
                 FROM daily_prizes dp
                 JOIN daily_inventory di ON dp.date = di.date AND dp.prize_id = di.prize_id
-                WHERE dp.date = ? AND dp.quantity > 0
+                WHERE dp.date = ?
                 ORDER BY dp.prize_id
             ''', (date_str,))
             
