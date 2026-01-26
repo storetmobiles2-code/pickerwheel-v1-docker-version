@@ -1,10 +1,11 @@
 @echo off
+setlocal enabledelayedexpansion
 color 0E
 cls
 
-echo =======================================
-echo    Restarting PickerWheel Contest...
-echo =======================================
+echo ================================================
+echo      Restarting PickerWheel v2 Containers
+echo ================================================
 echo.
 
 REM Check if Docker is running
@@ -18,35 +19,58 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Step 1: Stopping current container...
-docker-compose down
-timeout /t 2 /nobreak > nul
+REM Change to script directory then parent
+cd /d "%~dp0"
+cd ..
+
+echo Step 1: Stopping existing containers...
+echo.
+
+REM Check for docker compose v2 or docker-compose v1
+docker compose version > nul 2>&1
+if errorlevel 1 (
+    docker-compose -f docker-compose.yml down
+) else (
+    docker compose -f docker-compose.yml down
+)
 
 echo.
-echo Step 2: Starting fresh container...
-docker-compose up -d
+echo Step 2: Waiting for cleanup...
+timeout /t 3 /nobreak > nul
 
-REM Wait for the container to be ready
 echo.
-echo Step 3: Waiting for system to be ready...
-timeout /t 5 /nobreak > nul
+echo Step 3: Starting fresh containers...
+echo.
 
-REM Try to open the website
+docker compose version > nul 2>&1
+if errorlevel 1 (
+    docker-compose -f docker-compose.yml up -d --build
+) else (
+    docker compose -f docker-compose.yml up -d --build
+)
+
+if errorlevel 1 (
+    color 0C
+    echo ERROR: Failed to start containers!
+    pause
+    exit /b 1
+)
+
 echo.
-echo Step 4: Opening PickerWheel in your browser...
-start http://localhost:8082
+echo Step 4: Waiting for PostgreSQL to be ready...
+timeout /t 8 /nobreak > nul
 
 cls
 color 0A
-echo =======================================
-echo    PickerWheel has been restarted!
-echo =======================================
+echo ================================================
+echo      PickerWheel v2 restarted successfully!
+echo ================================================
 echo.
 echo Access URLs:
-echo - Main Contest: http://localhost:8082
-echo - Admin Panel:  http://localhost:8082/admin.html
+echo   - Main Wheel:    http://localhost:9080
+echo   - Admin Panel:   http://localhost:9080/admin
 echo.
 echo Admin Password: myTAdmin2025
-echo =======================================
+echo ================================================
 echo.
 pause
