@@ -1,180 +1,228 @@
-# Scripts Directory - Daily PickerWheel System
+# Scripts Directory - PickerWheel v2 (PostgreSQL)
 
-This directory contains essential scripts for managing the Daily PickerWheel Contest System.
+This directory contains scripts for managing the PickerWheel Contest System with PostgreSQL backend.
 
-## 🚀 Core System Scripts
+## 🚀 Quick Start
 
-### Server Management
-- **`start-server.sh`** - Start the daily backend server on port 9082
-- **`stop-server.sh`** - Stop all backend processes and free up ports
-- **`system-status.sh`** - Check system status, backend health, and configuration
-
-### Docker Management
-- **`docker.sh`** - Comprehensive Docker management script with multiple commands
-  ```bash
-  ./scripts/docker.sh start       # Build and start Docker container
-  ./scripts/docker.sh stop        # Stop and remove Docker container
-  ./scripts/docker.sh restart     # Restart Docker container
-  ./scripts/docker.sh status      # Check container status
-  ./scripts/docker.sh logs        # View container logs
-  ./scripts/docker.sh info        # Show system information
-  ./scripts/docker.sh test        # Test the running system
-  ./scripts/docker.sh clean       # Clean up Docker resources
-  ```
-
-## 📊 Data Management Scripts
-
-### Item Management
-- **`manage-itemlist.py`** - Python script to manage items in `itemlist_dates.txt`
-  ```bash
-  python3 scripts/manage-itemlist.py list          # List all items
-  python3 scripts/manage-itemlist.py add           # Add new item
-  python3 scripts/manage-itemlist.py update        # Update existing item
-  python3 scripts/manage-itemlist.py check         # Check availability
-  python3 scripts/manage-itemlist.py validate      # Validate itemlist
-  ```
-
-### CSV Management
-- **`generate_daily_csv.py`** - Generate daily CSV files from itemlist_dates.txt
-- **`manage-daily-csvs.sh`** - Shell script to manage daily CSV files
-  ```bash
-  ./scripts/manage-daily-csvs.sh generate    # Generate CSV files
-  ./scripts/manage-daily-csvs.sh status      # Show CSV status
-  ./scripts/manage-daily-csvs.sh clean       # Clean old files
-  ./scripts/manage-daily-csvs.sh verify      # Verify specific dates
-  ```
-
-## 🧪 Testing Scripts
-
-### System Testing
-- **`test-daily-system.sh`** - Comprehensive test of the daily system
-- **`test_daily_backend.py`** - Python script for backend testing
-
-## 📋 Quick Reference
-
-### Daily Operations
+### macOS / Linux
 ```bash
 # Start the system
-./scripts/start-server.sh
-
-# Check system status
-./scripts/system-status.sh
-
-# Test the system
-./scripts/test-daily-system.sh
-
-# Stop the system
-./scripts/stop-server.sh
-```
-
-### Item Management
-```bash
-# List all items
-python3 scripts/manage-itemlist.py list
-
-# Add new item
-python3 scripts/manage-itemlist.py add "New Prize" "Common" "50" "10" "*"
-
-# Check availability for specific date
-python3 scripts/manage-itemlist.py check 2025-10-02
-```
-
-### Docker Operations
-```bash
-# Start with Docker
 ./scripts/docker.sh start
 
-# Check Docker status
+# Check status
 ./scripts/docker.sh status
+
+# Run data migration (first time only)
+./scripts/docker.sh migrate
 
 # View logs
 ./scripts/docker.sh logs
-
-# Test the system
-./scripts/docker.sh test
-
-# Stop Docker
-./scripts/docker.sh stop
-
-# Get system information
-./scripts/docker.sh info
 ```
+
+### Windows
+```batch
+:: Use the interactive menu
+scripts\docker-menu.bat
+
+:: Or individual scripts
+scripts\start-pickerwheel.bat
+scripts\stop-pickerwheel.bat
+scripts\restart-pickerwheel.bat
+```
+
+## 📋 Script Reference
+
+### Docker Management (macOS/Linux) - `docker.sh`
+
+```bash
+./scripts/docker.sh [command]
+```
+
+| Command | Description |
+|---------|-------------|
+| `start` | Start PostgreSQL + PickerWheel containers |
+| `stop` | Stop all containers |
+| `restart` | Restart all containers |
+| `status` | Show container and health status |
+| `logs` | Show application logs (follow) |
+| `db-logs` | Show PostgreSQL logs |
+| `migrate` | Run data migration from itemlist_dates_v2.txt |
+| `shell` | Open bash shell in app container |
+| `db-shell` | Open PostgreSQL shell |
+| `info` | Show system information |
+| `test` | Test all API endpoints |
+| `clean` | Remove containers and volumes (CAUTION!) |
+| `legacy` | Use legacy SQLite backend |
+| `help` | Show help message |
+
+### Windows Scripts
+
+| Script | Description |
+|--------|-------------|
+| `docker-menu.bat` | Interactive menu for all operations |
+| `start-pickerwheel.bat` | Start containers |
+| `stop-pickerwheel.bat` | Stop containers |
+| `restart-pickerwheel.bat` | Restart containers |
 
 ## 🔧 Configuration
 
 ### Ports
-- **Backend**: 9082 (for direct server access)
-- **Docker**: 8082 (for Docker container access)
+
+| Version | Port | Description |
+|---------|------|-------------|
+| v2 (PostgreSQL) | 9080 | Main application |
+| v2 (PostgreSQL) | 5432 | PostgreSQL database |
+| Legacy (SQLite) | 8082 | Legacy application |
+
+### Access URLs
+
+- **Main Wheel**: http://localhost:9080
+- **Admin Panel**: http://localhost:9080/admin
+- **Admin Password**: `myTAdmin2025`
 
 ### Key Files
-- **`itemlist_dates.txt`** - Main item configuration file
-- **`daily_csvs/`** - Generated daily CSV files
-- **`pickerwheel_contest.db`** - SQLite database for transactions
 
-## 📝 Script Categories
+| File | Description |
+|------|-------------|
+| `itemlist_dates_v2.txt` | Prize configuration file |
+| `docker-compose.yml` | PostgreSQL Docker configuration |
+| `docker-compose.yml` | Legacy Docker configuration |
 
-### Essential Scripts (Keep)
-- `start-server.sh` - Core server startup
-- `stop-server.sh` - Core server shutdown
-- `system-status.sh` - System monitoring
-- `test-daily-system.sh` - System testing
-- `manage-itemlist.py` - Item management
-- `generate_daily_csv.py` - CSV generation
-- `manage-daily-csvs.sh` - CSV management
+## 🗃️ Database Commands
 
-### Docker Scripts (Optional)
-- `docker.sh` - Comprehensive Docker management (start, stop, restart, status, logs, info, test, clean)
+### Access PostgreSQL Shell
+```bash
+# macOS/Linux
+./scripts/docker.sh db-shell
+
+# Windows (from menu)
+# Option 5: Open Database Shell
+```
+
+### Common SQL Queries
+```sql
+-- View all prizes
+SELECT id, name, is_enabled, display_order FROM prizes;
+
+-- View available prizes for today
+SELECT p.name, i.remaining_quantity 
+FROM prizes p 
+JOIN prize_inventory i ON p.id = i.prize_id 
+WHERE i.available_date = CURRENT_DATE 
+AND p.is_enabled = TRUE;
+
+-- View recent transactions
+SELECT * FROM transactions ORDER BY created_at DESC LIMIT 10;
+
+-- View statistics
+SELECT category_id, COUNT(*) as wins 
+FROM transactions 
+WHERE created_at::date = CURRENT_DATE 
+GROUP BY category_id;
+```
+
+## 🔄 Data Migration
+
+First-time setup requires migrating data from `itemlist_dates_v2.txt`:
+
+```bash
+# macOS/Linux
+./scripts/docker.sh migrate
+
+# Windows (from menu)
+# Option 4: Run Data Migration
+```
+
+## 🧪 Testing
+
+### Test API Endpoints
+```bash
+# macOS/Linux
+./scripts/docker.sh test
+
+# Windows (from menu)
+# Option 9: Test API Endpoints
+```
+
+### Manual API Tests
+```bash
+# Health check
+curl http://localhost:9080/api/health
+
+# Get wheel display prizes
+curl http://localhost:9080/api/prizes/wheel-display
+
+# Get available prizes
+curl http://localhost:9080/api/prizes/available
+
+# Get statistics
+curl http://localhost:9080/api/stats
+```
 
 ## 🚨 Troubleshooting
 
-### Common Issues
-1. **Port conflicts**: Use `./scripts/stop-server.sh` to free up ports
-2. **Missing CSV files**: Run `python3 scripts/generate_daily_csv.py`
-3. **Backend not responding**: Check with `./scripts/system-status.sh`
-
-### Debug Commands
+### Container won't start
 ```bash
-# Check system status
-./scripts/system-status.sh
+# Check Docker is running
+docker info
 
-# Test system functionality
-./scripts/test-daily-system.sh
-
-# View server logs
-./scripts/start-server.sh  # Shows startup logs
-
-# Check Docker logs
+# View startup logs
 ./scripts/docker.sh logs
+
+# Restart containers
+./scripts/docker.sh restart
 ```
 
-## 📈 System Architecture
+### Database connection errors
+```bash
+# Check PostgreSQL is healthy
+docker exec pickerwheel-db pg_isready -U pickerwheel -d pickerwheel
 
-The daily system works as follows:
+# View database logs
+./scripts/docker.sh db-logs
+```
 
-1. **Item Configuration**: Items defined in `itemlist_dates.txt`
-2. **CSV Generation**: Daily CSV files generated from itemlist
-3. **Backend Processing**: `daily_database_backend.py` handles requests
-4. **Database Storage**: SQLite database for transactions and inventory
-5. **Frontend Display**: Shows all items, awards only available ones
+### Reset everything
+```bash
+# WARNING: This removes all data!
+./scripts/docker.sh clean
+./scripts/docker.sh start
+./scripts/docker.sh migrate
+```
 
-## 🔄 Workflow
+## 📦 Legacy Mode
 
-### Daily Operations
-1. Start system: `./scripts/start-server.sh`
-2. Check status: `./scripts/system-status.sh`
-3. Monitor: Use admin panel or API endpoints
-4. Stop system: `./scripts/stop-server.sh`
+To use the old SQLite backend:
 
-### Item Updates
-1. Edit items: `python3 scripts/manage-itemlist.py list`
-2. Add/update: Use management commands
-3. Regenerate CSVs: `python3 scripts/generate_daily_csv.py`
-4. Restart system: `./scripts/stop-server.sh && ./scripts/start-server.sh`
+```bash
+# macOS/Linux
+./scripts/docker.sh legacy start
+./scripts/docker.sh legacy stop
+
+# Windows (from menu)
+# Option L: Use Legacy Backend
+```
+
+Legacy backend runs on port 8082.
+
+## 📝 Data Validation Scripts
+
+### Validation Suite
+```bash
+./scripts/run_validation_suite.sh
+./scripts/validation_suite_curl.sh
+```
+
+### Prize Updates
+```bash
+python3 scripts/validate_and_update_prizes.py
+python3 scripts/verify_admin_data.py
+python3 scripts/update_csvs_from_v2.py
+```
 
 ## 📞 Support
 
-For issues or questions:
-1. Check system status: `./scripts/system-status.sh`
-2. Run system test: `./scripts/test-daily-system.sh`
-3. Check logs: `./scripts/start-server.sh` (shows startup logs)
-4. Review documentation: `../DAILY_README.md`
+1. Check status: `./scripts/docker.sh status`
+2. View logs: `./scripts/docker.sh logs`
+3. Test system: `./scripts/docker.sh test`
+4. Check README: `../README-v2.md`

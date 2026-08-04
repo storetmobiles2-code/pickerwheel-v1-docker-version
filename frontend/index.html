@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎉 myT MOBILES - Spin & Win Special! 🎊</title>
+    <title>myT MOBILES - Spin & Win!</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Meta tags -->
-    <meta name="description" content="myT MOBILES Spin & Win - Win amazing prizes including MASSAGE GUN, Smart TV, and more during our special offer!">
-    <meta name="keywords" content="myT MOBILES, special offer, spin wheel, prizes, mobile accessories, contest">
+    <meta name="description" content="myT MOBILES Spin & Win - Win amazing prizes with every spin!">
+    <meta name="keywords" content="myT MOBILES, spin wheel, prizes, contest, mobile accessories">
     <meta name="author" content="myT MOBILES">
     
     <!-- PWA Meta -->
-    <meta name="theme-color" content="#e8505b">
+    <meta name="theme-color" content="#FF9933">
     <link rel="manifest" href="manifest.json">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="myt-mobiles-logo.png">
     
     <!-- Styles with cache busting -->
-    <link rel="stylesheet" href="style.css?v=13.1_special_offer">
+    <link rel="stylesheet" href="style.css?v=16.0_magenta">
 </head>
 <body>
     <!-- Background Elements -->
@@ -46,9 +46,9 @@
                     <img src="myt-mobiles-logo.png" alt="myT MOBILES" class="logo-img">
                 </div>
                 <div class="title-section">
-                    <h1 class="main-title">🎉 SPIN & WIN Offer 🎊</h1>
+                    <h1 class="main-title">🎉 SPIN & WIN 🎊</h1>
                     <p class="subtitle">✨ myT Mobiles Special Offer - Win Exciting Prizes! ✨</p>
-                    <p class="offer-period">Get a chance to win a prize with every spin || Limited Time Only!</p>
+                    <p class="offer-period">Spin the wheel and win amazing prizes!</p>
                 </div>
                 <div class="control-buttons">
                     <button class="control-btn" id="soundToggle" title="Toggle Sound">
@@ -60,19 +60,6 @@
                     <button class="control-btn" id="adminBtn" onclick="openAdminPanel()" title="Admin Panel" style="display: none;">
                         <span class="control-icon">⚙️</span>
                     </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Lucky Draw Promotion -->
-        <div class="lucky-draw-section">
-            <div class="lucky-draw-box">
-                <div class="lucky-draw-animation-container">
-                    <div class="yamaha-scooter"></div>
-                </div>
-                <div class="lucky-draw-content">
-                    <h3 class="lucky-draw-title">Lucky Draw: Get a chance to win a Yamaha Fascino</h3>
-                    <p class="lucky-draw-terms">*Terms and conditions apply</p>
                 </div>
             </div>
         </div>
@@ -156,64 +143,6 @@
 
     <!-- Scripts -->
     <script>
-        // Initialize scooty animation
-        document.addEventListener('DOMContentLoaded', function() {
-            animateScooty();
-        });
-        
-        function animateScooty() {
-            // Create a custom scooty element with an image instead of emoji
-            // This ensures consistent rendering across platforms
-            const container = document.querySelector('.lucky-draw-animation-container');
-            const scooty = document.getElementById('animated-scooty');
-            
-            // Clear the container
-            scooty.innerHTML = '';
-            
-            // Create a span with the scooty emoji
-            const scootyEmoji = document.createElement('span');
-            scootyEmoji.textContent = '🛵';
-            scootyEmoji.style.fontSize = '2.5rem';
-            scootyEmoji.style.display = 'inline-block';
-            scooty.appendChild(scootyEmoji);
-            
-            let isMovingRight = true;
-            
-            function startAnimation() {
-                // Reset styles
-                scooty.style.animation = '';
-                scootyEmoji.style.transform = '';
-                
-                // Force a reflow
-                void scooty.offsetWidth;
-                
-                if (isMovingRight) {
-                    // Moving right - scooty should face right
-                    scooty.style.animation = 'moveLeftToRight 6s ease-in-out';
-                    scootyEmoji.style.transform = 'scaleX(1)';
-                } else {
-                    // Moving left - scooty should face left
-                    scooty.style.animation = 'moveRightToLeft 6s ease-in-out';
-                    scootyEmoji.style.transform = 'scaleX(-1)';
-                }
-            }
-            
-            function handleAnimationEnd() {
-                isMovingRight = !isMovingRight;
-                startAnimation();
-            }
-            
-            // Remove any existing event listeners to prevent duplicates
-            const newScooty = scooty.cloneNode(true);
-            container.replaceChild(newScooty, scooty);
-            
-            // Add event listener to the new element
-            newScooty.addEventListener('animationend', handleAnimationEnd);
-            
-            // Start the animation
-            startAnimation();
-        }
-        
         // Admin authentication state
         let isAdminAuthenticated = false;
         let adminSessionTimeout = null;
@@ -421,8 +350,16 @@
         console.log('%c🔐 Admin Access Available', 'color: #ffd700; font-size: 14px; font-weight: bold;');
         console.log('%cUse Ctrl+Shift+Alt+A to authenticate', 'color: #888; font-size: 12px;');
     </script>
+    
+    <!-- Theme Manager - Load before wheel.js -->
+    <script src="theme-manager.js?v=1.0"></script>
+    
     <!-- Script with cache busting -->
-    <script src="wheel.js?v=13.1_special_offer"></script>
+    <script src="wheel.js?v=14.0_themed"></script>
+    
+    <!-- Socket.IO for real-time updates -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="wheel-realtime.js?v=2.0"></script>
     
     <!-- Force cache refresh -->
     <script>

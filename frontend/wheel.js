@@ -67,8 +67,8 @@ class PickerWheelUI {
             return {
                 wheelSize: Math.min(window.innerWidth * 0.9, 450), // 90% of screen width, max 450px
                 fontSize: {
-                    emoji: '18px',
-                    text: '12px',
+                    emoji: '16px',
+                    text: '10px',  // Reduced from 12px for better fit
                     modal: '4rem'
                 },
                 spinButton: '60px'
@@ -77,8 +77,8 @@ class PickerWheelUI {
             return {
                 wheelSize: 400,
                 fontSize: {
-                    emoji: '16px',
-                    text: '11px',
+                    emoji: '14px',
+                    text: '9px',   // Reduced from 11px for better fit
                     modal: '3rem'
                 },
                 spinButton: '50px'
@@ -89,6 +89,12 @@ class PickerWheelUI {
     async init() {
         try {
             console.log('🎯 Initializing PickerWheel UI...');
+            
+            // Load theme configuration first
+            if (window.themeManager) {
+                await window.themeManager.loadConfig();
+                window.themeManager.applyTheme();
+            }
             
             // Get DOM elements
             this.wheel = document.getElementById('wheel');
@@ -535,7 +541,12 @@ class PickerWheelUI {
                 throw new Error(data.error || 'Failed to load prizes');
             }
             
-            this.availablePrizes = data.prizes || [];
+            // Normalize prize data - map prize_id to id for consistency
+            this.availablePrizes = (data.prizes || []).map(prize => ({
+                ...prize,
+                id: prize.prize_id || prize.id,  // Ensure 'id' is always available
+                category: prize.category_name || prize.category  // Normalize category name
+            }));
             
             console.log(`✅ Loaded ${this.availablePrizes.length} unique prizes (deduplicated by backend)`);
             if (data.original_count) {
@@ -597,15 +608,18 @@ class PickerWheelUI {
         this.segmentAngle = 360 / this.availablePrizes.length;
         
         // Create segments with equal sizes
-        this.segments = this.availablePrizes.map((prize, index) => ({
-            ...prize,
-            index,
-            angle: this.segmentAngle,
-            startAngle: index * this.segmentAngle,
-            endAngle: (index + 1) * this.segmentAngle,
-            color: this.getPrizeColor(prize.category, index),
-            textColor: this.getTextColor(prize.category)
-        }));
+        this.segments = this.availablePrizes.map((prize, index) => {
+            const color = this.getPrizeColor(prize.category, index);
+            return {
+                ...prize,
+                index,
+                angle: this.segmentAngle,
+                startAngle: index * this.segmentAngle,
+                endAngle: (index + 1) * this.segmentAngle,
+                color: color,
+                textColor: this.getTextColor(prize.category, color)
+            };
+        });
 
         // Debug: Log segment mapping
         console.log('🎡 Segment mapping:');
@@ -772,8 +786,8 @@ class PickerWheelUI {
         const adjustedAngleRad = angleRad + angleOffset;
         
         // Use same radial distance for both lines to keep them aligned
-        const startRadius = radius * 0.55; // Start after emoji
-        const endRadius = radius * 0.85;   // End near edge
+        const startRadius = radius * 0.50; // Start closer to emoji for more text space
+        const endRadius = radius * 0.92;   // End closer to edge for more text space
         
         const lineStartX = centerX + startRadius * Math.cos(adjustedAngleRad);
         const lineStartY = centerY + startRadius * Math.sin(adjustedAngleRad);
@@ -918,43 +932,62 @@ class PickerWheelUI {
     }
     
     abbreviatePrizeNameRadial(name) {
-        // Create compact abbreviations for radial display
+        // Create compact abbreviations for radial display - more aggressive for better fit
         const abbreviations = {
-            'smartwatch + mini cooler': 'Watch + Cooler',
-            'defy buds + g speaker': 'Buds + Speaker', 
-            'power bank + neckband': 'PowerBank + Neckband',
+            // Combo items - compact format
+            'smartwatch + mini cooler': 'Watch+Cooler',
+            'defy buds + g speaker': 'Buds+Speaker', 
+            'defy buds + google speaker': 'Buds+Speaker',
+            'power bank + neckband': 'PwrBnk+Neck',
+            'powerbank + neckband': 'PwrBnk+Neck',
+            'trimmer + skull candy earphones': 'Trimmer+Earph',
+            'trimmer + skullcandy earphones': 'Trimmer+Earph',
+            'skull candy earphones + selie stick': 'SkullCandy+Stick',
+            'powerbank + wired earphones': 'PwrBnk+Earph',
+            'defy buds + screen guard': 'Buds+Guard',
+            'free pouch and screen guard': 'Pouch+Guard',
+            
+            // Home appliances - shortened
             'intex home theatre': 'Intex Theatre',
-            'zebronics home theatre': 'Zebronics Theatre',
-            'zebronics astra bt speaker': 'Zebronics BT Speaker',
-            'zebronics bt astra speaker': 'Zebronics BT Speaker',
+            'zebronics home theatre': 'Zebr Theatre',
+            'zebronics astra bt speaker': 'Zebr BT Spkr',
+            'zebronics bt astra speaker': 'Zebr BT Spkr',
             'smart tv 32 inches': 'Smart TV 32"',
-            'boult 60w soundbar': 'Boult Soundbar',
-            'free pouch and screen guard': 'Pouch + Guard',
-            'trimmer + skull candy earphones': 'Trimmer + Earphones',
-            'skull candy earphones + selie stick': 'Skull Candy + Stick',
-            'powerbank + wired earphones': 'PowerBank + Earphones',
+            'smart tv 32"': 'Smart TV 32"',
+            'boult 60w soundbar': 'Boult Sndbar',
             'mi smart speaker': 'Mi Speaker',
+            'xiaomi smart speaker': 'Xiaomi Spkr',
+            'pressure cooker': 'Pres Cooker',
+            'washing machine': 'Wash Machine',
+            'mixer grinder': 'Mixer Grndr',
+            'refrigerator': 'Fridge',
+            'air cooler': 'Air Cooler',
+            'gas stove': 'Gas Stove',
+            'dinner set': 'Dinner Set',
+            'casserolle set': 'Casserole',
+            
+            // Electronics - compact
+            'boat smartwatch': 'Boat Watch',
             'budget smartphone': 'Budget Phone',
+            'low cost mobile': 'Budget Phone',
             'massage gun': 'Massage Gun',
-            'defy buds + screen guard': 'Defy Buds + Guard',
-            'boat smartwatch': 'Boat Smartwatch',
-            'pressure cooker': 'Pressure Cooker',
-            'washing machine': 'Washing Machine',
-            'mixer grinder': 'Mixer Grinder'
+            'jio tab': 'Jio Tab',
+            'silver coin': 'Silver Coin',
+            'luggage bags': 'Luggage Bag'
         };
         
-        const lowerName = name.toLowerCase();
+        const lowerName = name.toLowerCase().trim();
         if (abbreviations[lowerName]) {
             return abbreviations[lowerName];
         }
         
-        // Fallback: smart truncation
-        if (name.length > 18) {
+        // Fallback: smart truncation with max 14 chars
+        if (name.length > 14) {
             // Try to truncate at word boundary
             const words = name.split(' ');
             let result = words[0];
             for (let i = 1; i < words.length; i++) {
-                if ((result + ' ' + words[i]).length <= 18) {
+                if ((result + ' ' + words[i]).length <= 14) {
                     result += ' ' + words[i];
                 } else {
                     break;
@@ -968,11 +1001,43 @@ class PickerWheelUI {
     
     formatPrizeNameForTwoLines(name) {
         // Format name for two-line radial display to prevent cropping
-        const maxLineLength = 14; // Increased for better readability
+        const maxLineLength = 12; // Reduced for better fit in narrow segments
+        const maxPartLength = 10; // Max length for each part in combos
         
-        // Use smart abbreviations first for very long names
-        if (name.length > 25) {
-            name = this.abbreviatePrizeNameRadial(name);
+        // First, try to get a known abbreviation
+        const abbreviated = this.abbreviatePrizeNameRadial(name);
+        if (abbreviated !== name && abbreviated.length <= maxLineLength * 2) {
+            // If abbreviated has newline already, use it
+            if (abbreviated.includes('\n')) {
+                return abbreviated;
+            }
+            // If abbreviated fits on one line, use it
+            if (abbreviated.length <= maxLineLength) {
+                return abbreviated;
+            }
+            // Use abbreviated name for further processing
+            name = abbreviated;
+        }
+        
+        // Handle combo items with "+" - display both parts compactly
+        if (name.includes('+')) {
+            const parts = name.split('+').map(p => p.trim());
+            if (parts.length === 2) {
+                // Format each part to be very concise
+                const part1 = this.shortenName(parts[0], maxPartLength);
+                const part2 = this.shortenName(parts[1], maxPartLength);
+                return `${part1}\n+${part2}`;
+            }
+        }
+        
+        // Handle "and" combinations
+        if (name.toLowerCase().includes(' and ')) {
+            const parts = name.split(/\s+and\s+/i).map(p => p.trim());
+            if (parts.length === 2) {
+                const part1 = this.shortenName(parts[0], maxPartLength);
+                const part2 = this.shortenName(parts[1], maxPartLength);
+                return `${part1}\n+${part2}`;
+            }
         }
         
         // If still too long, split into two lines
@@ -980,23 +1045,16 @@ class PickerWheelUI {
             const words = name.split(' ');
             
             if (words.length === 1) {
-                // Single long word - split in middle
-                const mid = Math.ceil(name.length / 2);
-                return `${name.substring(0, mid)}\n${name.substring(mid)}`;
+                // Single long word - just return abbreviated version
+                return this.shortenName(name, maxLineLength);
             } else if (words.length === 2) {
                 // Two words - one per line
-                return `${words[0]}\n${words[1]}`;
+                return `${this.shortenName(words[0], maxPartLength)}\n${this.shortenName(words[1], maxPartLength)}`;
             } else {
                 // Multiple words - balance the lines
                 const mid = Math.ceil(words.length / 2);
-                const firstLine = words.slice(0, mid).join(' ');
-                const secondLine = words.slice(mid).join(' ');
-                
-                // Ensure neither line is too long
-                if (firstLine.length > maxLineLength + 2 || secondLine.length > maxLineLength + 2) {
-                    // Fallback: just use first word + "..."
-                    return `${words[0]}\n${words[1] || '...'}`;
-                }
+                const firstLine = this.shortenName(words.slice(0, mid).join(' '), maxLineLength);
+                const secondLine = this.shortenName(words.slice(mid).join(' '), maxLineLength);
                 
                 return `${firstLine}\n${secondLine}`;
             }
@@ -1004,6 +1062,58 @@ class PickerWheelUI {
         
         // Short enough for single line
         return name;
+    }
+    
+    shortenName(name, maxLength) {
+        // Shorten a name intelligently - more aggressive abbreviations
+        if (name.length <= maxLength) return name;
+        
+        // Common abbreviations - ordered by length (longer first for better matching)
+        const abbrevs = {
+            'refrigerator': 'Fridge',
+            'mini cooler': 'Cooler',
+            'screen guard': 'Guard',
+            'power bank': 'PwrBnk',
+            'powerbank': 'PwrBnk',
+            'smartwatch': 'Watch',
+            'skull candy': 'Skull',
+            'skullcandy': 'Skull',
+            'zebronics': 'Zebr',
+            'bluetooth': 'BT',
+            'earphones': 'Earph',
+            'neckband': 'Neck',
+            'speaker': 'Spkr',
+            'google': 'G',
+            'cooler': 'Cool',
+            'theatre': 'Thtr',
+            'soundbar': 'Sndbar',
+            'grinder': 'Grndr',
+            'machine': 'Mach',
+            'pressure': 'Pres',
+            'trimmer': 'Trim',
+            'luggage': 'Lugg'
+        };
+        
+        let result = name;
+        for (const [full, abbr] of Object.entries(abbrevs)) {
+            result = result.replace(new RegExp(full, 'gi'), abbr);
+        }
+        
+        // If still too long, truncate at word boundary without ".."
+        if (result.length > maxLength) {
+            const words = result.split(' ');
+            let truncated = words[0];
+            for (let i = 1; i < words.length; i++) {
+                if ((truncated + ' ' + words[i]).length <= maxLength) {
+                    truncated += ' ' + words[i];
+                } else {
+                    break;
+                }
+            }
+            return truncated.length > 0 ? truncated : result.substring(0, maxLength);
+        }
+        
+        return result;
     }
 
     formatPrizeNameForSVG(name) {
@@ -1019,20 +1129,202 @@ class PickerWheelUI {
         return name;
     }
 
-    getPrizeColor(category, index) {
-        // Festive warm color palette to match the special offer theme
-        const colors = {
-            'ultra_rare': ['#FFD700', '#FF6B35', '#C41E3A', '#9B59B6', '#E74C3C', '#F39C12'],
-            'rare': ['#FF6B35', '#E74C3C', '#F39C12', '#D35400', '#C0392B', '#FF8C42'],
-            'common': ['#FF6B35', '#F39C12', '#E74C3C', '#F1C40F', '#E67E22', '#FF8C42', '#FFA07A', '#FFB84D', '#FF7F50', '#FFA500']
-        };
-        
-        const categoryColors = colors[category] || colors.common;
-        return categoryColors[index % categoryColors.length];
+    // ==========================================
+    // INCREMENTAL UPDATE METHODS
+    // For real-time wheel updates without full rebuild
+    // ==========================================
+
+    /**
+     * Update prizes and rebuild wheel with optional animation
+     * Called by wheel-realtime.js for real-time updates
+     */
+    updatePrizes(newPrizes, animate = true) {
+        if (!newPrizes || newPrizes.length === 0) {
+            console.warn('No prizes to update');
+            return false;
+        }
+
+        // If spinning, queue update
+        if (this.isSpinning) {
+            this._pendingPrizeUpdate = newPrizes;
+            console.log('⏳ Update queued - wheel is spinning');
+            return false;
+        }
+
+        const oldPrizes = [...this.availablePrizes];
+        const changes = this.detectPrizeChanges(oldPrizes, newPrizes);
+
+        console.log('🔄 Prize changes detected:', {
+            added: changes.added.length,
+            removed: changes.removed.length,
+            modified: changes.modified.length
+        });
+
+        // Format prizes
+        this.availablePrizes = newPrizes.map(prize => ({
+            id: prize.prize_id || prize.id,
+            prize_id: prize.prize_id || prize.id,
+            name: prize.name || prize.prize_name,
+            category: prize.category_name || prize.category,
+            category_name: prize.category_name || prize.category,
+            emoji: prize.emoji || '🎁',
+            is_enabled: prize.is_enabled !== false,
+            remaining_quantity: prize.remaining_quantity || 0
+        }));
+
+        // Rebuild wheel with animation
+        if (animate) {
+            this.animateWheelRebuild();
+        } else {
+            this.createWheel();
+        }
+
+        return true;
     }
 
-    getTextColor(category) {
-        return category === 'ultra_rare' ? '#000000' : '#FFFFFF';
+    /**
+     * Detect changes between old and new prizes
+     */
+    detectPrizeChanges(oldPrizes, newPrizes) {
+        const oldIds = new Set(oldPrizes.map(p => p.id || p.prize_id));
+        const newIds = new Set(newPrizes.map(p => p.id || p.prize_id));
+        const oldMap = new Map(oldPrizes.map(p => [p.id || p.prize_id, p]));
+        const newMap = new Map(newPrizes.map(p => [p.id || p.prize_id, p]));
+
+        const added = [];
+        const removed = [];
+        const modified = [];
+
+        // Find added prizes
+        newIds.forEach(id => {
+            if (!oldIds.has(id)) {
+                added.push(newMap.get(id));
+            }
+        });
+
+        // Find removed prizes
+        oldIds.forEach(id => {
+            if (!newIds.has(id)) {
+                removed.push(oldMap.get(id));
+            }
+        });
+
+        // Find modified prizes
+        newIds.forEach(id => {
+            if (oldIds.has(id)) {
+                const oldPrize = oldMap.get(id);
+                const newPrize = newMap.get(id);
+                if (this.isPrizeModified(oldPrize, newPrize)) {
+                    modified.push({ old: oldPrize, new: newPrize });
+                }
+            }
+        });
+
+        return { added, removed, modified };
+    }
+
+    /**
+     * Check if a prize has been modified
+     */
+    isPrizeModified(oldPrize, newPrize) {
+        return (
+            oldPrize.name !== (newPrize.name || newPrize.prize_name) ||
+            oldPrize.is_enabled !== (newPrize.is_enabled !== false) ||
+            oldPrize.emoji !== (newPrize.emoji || '🎁')
+        );
+    }
+
+    /**
+     * Animate wheel rebuild with fade effect
+     */
+    animateWheelRebuild() {
+        if (!this.wheelInner) {
+            this.createWheel();
+            return;
+        }
+
+        // Fade out
+        this.wheelInner.style.transition = 'opacity 0.2s ease-out';
+        this.wheelInner.style.opacity = '0.5';
+
+        // Rebuild after fade out
+        setTimeout(() => {
+            this.createWheel();
+            
+            // Fade in
+            requestAnimationFrame(() => {
+                this.wheelInner.style.opacity = '1';
+                setTimeout(() => {
+                    this.wheelInner.style.transition = '';
+                }, 200);
+            });
+        }, 200);
+    }
+
+    /**
+     * Get current prize count
+     */
+    getPrizeCount() {
+        return this.availablePrizes?.length || 0;
+    }
+
+    /**
+     * Get prize by ID
+     */
+    getPrizeById(prizeId) {
+        return this.availablePrizes?.find(p => (p.id || p.prize_id) === prizeId);
+    }
+
+    /**
+     * Check if wheel needs update based on new prizes
+     */
+    needsUpdate(newPrizes) {
+        if (!newPrizes || !this.availablePrizes) return true;
+        if (newPrizes.length !== this.availablePrizes.length) return true;
+        
+        // Check for any changes
+        const changes = this.detectPrizeChanges(this.availablePrizes, newPrizes);
+        return changes.added.length > 0 || 
+               changes.removed.length > 0 || 
+               changes.modified.length > 0;
+    }
+
+    // ==========================================
+    // END INCREMENTAL UPDATE METHODS
+    // ==========================================
+
+    getPrizeColor(category, index) {
+        // Get colors from ThemeManager if available, otherwise use defaults
+        let colors;
+        
+        if (window.themeManager && window.themeManager.activeTheme?.wheel?.colors) {
+            colors = window.themeManager.getWheelColors();
+        } else {
+            // Default tricolor palette
+            colors = [
+                '#FF9933',  // Saffron
+                '#138808',  // Green
+                '#FFB366',  // Light Saffron
+                '#1DB954',  // Light Green
+                '#E67300',  // Dark Saffron
+                '#2E8B57',  // Sea Green
+                '#FF7F00',  // Deep Orange
+                '#228B22',  // Forest Green
+                '#FFA500',  // Orange
+                '#32CD32',  // Lime Green
+            ];
+        }
+        
+        return colors[index % colors.length];
+    }
+
+    getTextColor(category, segmentColor) {
+        // Light saffron shades need dark text, others use white
+        const lightColors = ['#FFB366', '#FFA500'];
+        if (segmentColor && lightColors.includes(segmentColor)) {
+            return '#1a1a2e';  // Dark text for light saffron backgrounds
+        }
+        return '#FFFFFF';  // White text for all other backgrounds
     }
 
     async spin() {
@@ -1806,8 +2098,11 @@ class PickerWheelUI {
         
         // Verify mapping between backend selection and wheel display
         const wheelPrizeAtSegment = this.segments[targetSegment];
+        console.log(`🔍 Verifying: Wheel segment ${targetSegment} ID=${wheelPrizeAtSegment?.id}, Backend prize ID=${prize.id}`);
+        
         if (!wheelPrizeAtSegment || wheelPrizeAtSegment.id !== prize.id) {
-            throw new Error(`Mapping error: Backend prize ${prize.id} doesn't match wheel segment ${targetSegment}`);
+            console.error(`❌ Mapping mismatch! Wheel segments:`, this.segments.map(s => ({idx: s.index, id: s.id, name: s.name})));
+            throw new Error(`Mapping error: Backend prize ${prize.id} doesn't match wheel segment ${targetSegment} (segment has ID: ${wheelPrizeAtSegment?.id})`);
         }
         
         console.log(`✅ Mapping verified: Segment ${targetSegment} = ${wheelPrizeAtSegment.name}`);
@@ -2410,7 +2705,7 @@ class PickerWheelUI {
                 <td class="time-cell">${prize.formatted_time}</td>
                 <td class="user-cell">${prize.user_identifier}</td>
                 <td>
-                    <span class="category-badge ${prize.category}">${prize.category.replace('_', ' ')}</span>
+                    <span class="category-badge ${prize.category || 'common'}">${(prize.category || 'common').replace('_', ' ')}</span>
                 </td>
             `;
             this.dailyPrizesTableBody.appendChild(row);
@@ -2474,7 +2769,7 @@ class PickerWheelUI {
             name: prize.name,
             user_identifier: 'You',
             formatted_time: now.toLocaleTimeString(),
-            category: prize.category,
+            category: prize.category || prize.category_name || 'common',  // Handle both naming conventions
             emoji: prize.emoji
         };
         
