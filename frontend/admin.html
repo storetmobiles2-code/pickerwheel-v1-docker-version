@@ -1940,10 +1940,15 @@
         
         // Update Daily Limit (updates the default template's daily limit for this prize)
         async function updateDailyLimit(prizeId, limit) {
+            const dailyLimit = parseInt(limit, 10);
+            if (Number.isNaN(dailyLimit) || dailyLimit < 1) {
+                showToast('Daily limit must be a whole number of at least 1', 'error');
+                loadPrizes(); // Restore the saved value
+                return;
+            }
             try {
-                // Find the template_prize_id for this prize in the default template
-                // For now, we'll update via the inventory set endpoint which handles daily_limit
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { daily_limit: parseInt(limit) || 5 });
+                // Saves today's limit (what spins enforce) and syncs the default template
+                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { daily_limit: dailyLimit });
                 if (data.success) {
                     showToast('Daily limit updated', 'success');
                 } else {

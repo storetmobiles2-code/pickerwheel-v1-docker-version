@@ -296,20 +296,39 @@ def set_inventory(prize_id):
                     'error': 'Inventory not found'
                 }), 404
         
-        # Update daily limit in default template if provided
+        # Update daily limit if provided
         if daily_limit is not None:
+            try:
+                daily_limit = int(daily_limit)
+            except (TypeError, ValueError):
+                daily_limit = -1
+            if daily_limit < 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'daily_limit must be a non-negative integer'
+                }), 400
+
+            # The date's inventory row is what the admin table shows and what
+            # spins enforce (consume_prize / get_available_prizes)
+            result = Inventory.update_quantity(
+                prize_id, event_id, target_date, daily_limit=daily_limit
+            )
+            if not result:
+                return jsonify({
+                    'success': False,
+                    'error': 'Inventory not found'
+                }), 404
+
+            # Keep the default template in step so future dates populated
+            # from it use the same limit. Only the limit changes - the
+            # template's quantity and enabled flag are left as configured.
             default_template = DailyPrizeTemplate.get_default()
             if default_template:
-                # Update or add prize to default template with new daily limit
-                template_result = DailyPrizeTemplate.add_prize(
-                    default_template['id'],
-                    prize_id,
-                    quantity=5,  # Default quantity in template
-                    daily_limit=daily_limit,
-                    is_enabled=True
+                DailyPrizeTemplate.set_prize_daily_limit(
+                    default_template['id'], prize_id, daily_limit
                 )
-                if template_result:
-                    logger.info(f"Updated daily_limit for prize {prize_id} to {daily_limit}")
+
+            logger.info(f"Updated daily_limit for prize {prize_id} on {target_date} to {daily_limit}")
         
         # Broadcast update
         if quantity is not None:

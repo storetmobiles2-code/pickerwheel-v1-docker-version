@@ -190,6 +190,22 @@ class DailyPrizeTemplate:
         return results[0] if results else None
     
     @staticmethod
+    def set_prize_daily_limit(template_id, prize_id, daily_limit):
+        """Update only the daily limit of a prize already in a template"""
+        sql = """
+            UPDATE template_prizes
+            SET daily_limit = :daily_limit
+            WHERE template_id = :template_id AND prize_id = :prize_id
+            RETURNING id, template_id, prize_id, quantity, daily_limit, is_enabled
+        """
+        results = execute_sql(sql, {
+            'template_id': template_id,
+            'prize_id': prize_id,
+            'daily_limit': daily_limit
+        })
+        return results[0] if results else None
+
+    @staticmethod
     def remove_prize(template_id, prize_id):
         """Remove a prize from a template"""
         sql = """
