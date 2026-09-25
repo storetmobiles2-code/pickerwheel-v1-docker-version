@@ -2,11 +2,11 @@
  * ThemeManager - applies a running special event's theme on top of Neon.
  *
  * The page has exactly two built-in designs, both defined in style.css:
- * Neon (default) and Material (black & white), switched by the
+ * Neon (default) and Material (Google's own UI palette), switched by the
  * data-design-mode attribute. The only server-side theme is one attached to
  * a currently active special event (from /api/config); it recolours the
  * Neon design while the event runs. Material ignores event colours so it
- * always stays black & white.
+ * always keeps Google's Blue/Red/Yellow/Green palette.
  */
 
 class ThemeManager {
