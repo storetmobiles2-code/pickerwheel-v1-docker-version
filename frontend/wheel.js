@@ -2093,7 +2093,8 @@ class PickerWheelUI {
         const confettiCount = category === 'rare' || category === 'ultra_rare' ? 50 : 30;
         const isMaterial = document.documentElement.dataset.designMode === 'material';
         const colors = isMaterial
-            ? ['#FFFFFF', '#111111', '#5C5C5C', '#A6A6A6', '#E0E0E0']
+            // Google's own four brand colours, same order as the "G" logo
+            ? ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FFFFFF']
             : category === 'rare' || category === 'ultra_rare'
                 ? ['#FFD36B', '#F5B83D', '#FF2B86', '#FF4FA3', '#E50065', '#FFFFFF', '#FFC2DD', '#FF8CC0']
                 : ['#FFD36B', '#FF2B86', '#FF4FA3', '#E50065', '#FFFFFF'];

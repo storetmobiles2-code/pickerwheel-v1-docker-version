@@ -1,13 +1,14 @@
-/* myT MOBILES - Spin & Win - v20.0
+/* myT MOBILES - Spin & Win - v21.0
  *
  * Default design: "Neon" - a dark, cinematic promo stage with a large
  * glowing wheel, glass panels and pink bloom. Toggle to the flat,
- * Vodafone-inspired "Material" design via data-design-mode="material" on
+ * Google Material-inspired design via data-design-mode="material" on
  * <html> (see the design-mode script in index.html).
  *
  * These are the only two designs. While a special event with its own theme
  * is running, theme-manager.js recolours Neon's background, header tint and
- * wheel inline from the event's colours; Material always stays black & white.
+ * wheel inline from the event's colours; Material always keeps Google's own
+ * palette (Blue/Red/Yellow/Green) and ignores event colours.
  */
 
 :root {
@@ -46,22 +47,39 @@
 
 }
 
-/* Material: strictly black & white (greys only) - flat, light surfaces,
-   no glow, bold headlines, generous white space. */
+/* Material: Google's own Material Design language - Google Sans/Roboto
+   type, Google Blue as the primary action colour, the four brand colours
+   (Blue/Red/Yellow/Green) cycling around the wheel, flat white surfaces
+   with real elevation shadows, generous white space. */
 :root[data-design-mode="material"] {
-    --primary: #111111;
-    --primary-light: #111111;
-    --primary-hot: #111111;
-    --primary-dark: #333333;
+    /* Google Blue - primary actions, links, the accent title word */
+    --primary: #1A73E8;
+    --primary-light: #4285F4;
+    --primary-hot: #4285F4;
+    --primary-dark: #1765CC;
 
-    --text-primary: #111111;
-    --text-secondary: #555555;
-    --text-muted: #8A8A8A;
-    --accent-color: #111111;
+    /* Google's on-surface greyscale (the same greys google.com/Android use) */
+    --text-primary: #202124;
+    --text-secondary: #5F6368;
+    --text-muted: #80868B;
+    --accent-color: #1A73E8;
+
+    /* The four Google brand colours, used on the wheel and small accents */
+    --g-blue: #4285F4;
+    --g-red: #EA4335;
+    --g-yellow: #FBBC04;
+    --g-green: #34A853;
 
     --glass-bg: #FFFFFF;
-    --glass-border: rgba(0, 0, 0, 0.06);
+    --glass-border: #DADCE0;
     --glass-shadow: var(--elevation-shadow);
+
+    --surface-border: #DADCE0;
+    --surface-2: #F1F3F4;
+    --surface-3: #F8F9FA;
+    /* Google Material elevation tokens (elevation 1 / elevation 2) */
+    --elevation-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.30), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+    --elevation-shadow-2: 0 1px 2px 0 rgba(60, 64, 67, 0.30), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
 }
 
 *,
@@ -1260,6 +1278,7 @@ body.spinning {
 
 [data-design-mode="material"] body {
     background: #FFFFFF;
+    font-family: 'Roboto', 'Poppins', sans-serif;
 }
 
 [data-design-mode="material"] body::before,
@@ -1315,7 +1334,7 @@ body.spinning {
 
 [data-design-mode="material"] .offer-period {
     color: var(--text-primary);
-    background: #F4F4F6;
+    background: var(--surface-2);
     border: 1px solid var(--surface-border);
     box-shadow: none;
 }
@@ -1328,8 +1347,9 @@ body.spinning {
 }
 
 [data-design-mode="material"] .control-btn:hover {
-    border-color: rgba(0, 0, 0, 0.15);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    color: var(--primary);
+    border-color: var(--primary-light);
+    box-shadow: var(--elevation-shadow-2);
 }
 
 [data-design-mode="material"] .wheel {
@@ -1355,6 +1375,7 @@ body.spinning {
 [data-design-mode="material"] .wheel-center-button {
     background: var(--primary);
     border: 4px solid #FFFFFF;
+    font-family: 'Roboto', sans-serif;
     text-shadow: none;
     box-shadow: var(--elevation-shadow), 0 4px 14px rgba(0, 0, 0, 0.2);
 }
@@ -1374,6 +1395,7 @@ body.spinning {
     background: var(--primary);
     border: none;
     border-radius: 12px;
+    font-family: 'Roboto', sans-serif;
     box-shadow: var(--elevation-shadow);
 }
 
@@ -1392,7 +1414,7 @@ body.spinning {
 
 [data-design-mode="material"] .step-item,
 [data-design-mode="material"] .daily-prizes-table td {
-    background: #F7F7F9;
+    background: var(--surface-3);
     border-color: transparent;
 }
 
@@ -1407,22 +1429,22 @@ body.spinning {
 
 [data-design-mode="material"] .log-btn {
     color: var(--text-primary);
-    background: #F4F4F6;
+    background: var(--surface-2);
     border-color: transparent;
 }
 
 [data-design-mode="material"] .log-btn:hover {
-    background: #EBEBEF;
+    background: #E8EAED;
     color: var(--text-primary);
 }
 
 [data-design-mode="material"] .daily-prizes-table tbody tr:hover td {
-    background: #F0F0F3;
+    background: #E8EAED;
 }
 
 [data-design-mode="material"] .log-prize-icon {
     color: var(--primary);
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(26, 115, 232, 0.08);
     border-color: transparent;
 }
 
@@ -1450,60 +1472,75 @@ body.spinning {
 }
 
 [data-design-mode="material"] .error-message {
-    color: var(--text-primary);
-    background: #F2F2F2;
-    border-color: rgba(0, 0, 0, 0.2);
+    color: #C5221F;
+    background: rgba(234, 67, 53, 0.08);
+    border-color: rgba(234, 67, 53, 0.35);
 }
 
-/* Black & white wheel. The slice/label colors are SVG attributes set from the
-   theme palette in wheel.js; CSS overrides them here so the palette toggle
-   switches instantly without re-rendering the wheel. Slices are drawn first
-   (paths), then one label <g> per slice in the same order, so :nth-of-type
-   parity lines each label up with its slice. */
+/* Google four-colour wheel. The slice/label colors are SVG attributes set
+   from the theme palette in wheel.js; CSS overrides them here so the
+   palette toggle switches instantly without re-rendering the wheel. Slices
+   are drawn first (paths), then one label <g> per slice in the same order,
+   so :nth-of-type parity lines each label up with its slice. The four
+   colours cycle Blue/Red/Yellow/Green - the same order as the Google "G". */
+[data-design-mode="material"] .wheel-label {
+    font-family: 'Roboto', sans-serif;
+}
+
 [data-design-mode="material"] .wheel-inner path {
-    fill: #FFFFFF;
-    stroke: #CFCFCF;
+    stroke: #FFFFFF;
+    stroke-width: 2px;
 }
 
-[data-design-mode="material"] .wheel-inner path:nth-of-type(odd) {
-    fill: #111111;
+[data-design-mode="material"] .wheel-inner path:nth-of-type(4n+1) {
+    fill: var(--g-blue);
 }
 
-/* Odd prize count: the last slice would be black next to black slice 0 */
-[data-design-mode="material"] .wheel-inner path:nth-of-type(odd):last-of-type {
-    fill: #5C5C5C;
+[data-design-mode="material"] .wheel-inner path:nth-of-type(4n+2) {
+    fill: var(--g-red);
+}
+
+[data-design-mode="material"] .wheel-inner path:nth-of-type(4n+3) {
+    fill: var(--g-yellow);
+}
+
+[data-design-mode="material"] .wheel-inner path:nth-of-type(4n) {
+    fill: var(--g-green);
+}
+
+/* When the slice count % 4 == 1, the last slice lands on the same 4n+1
+   (blue) position as slice 1 - and they're adjacent on the circular wheel.
+   Force it to red instead so no two adjacent slices ever share a colour. */
+[data-design-mode="material"] .wheel-inner path:nth-of-type(4n+1):last-of-type {
+    fill: var(--g-red);
 }
 
 [data-design-mode="material"] .wheel-inner path:hover {
-    stroke: #8A8A8A;
+    stroke: var(--text-primary);
 }
 
+/* White labels on the three darker slices, dark labels on yellow */
 [data-design-mode="material"] .wheel-inner g text {
-    fill: #111111;
+    fill: #FFFFFF;
     stroke: none;
 }
 
-[data-design-mode="material"] .wheel-inner g:nth-of-type(odd) text {
-    fill: #FFFFFF;
+[data-design-mode="material"] .wheel-inner g:nth-of-type(4n+3) text {
+    fill: #202124;
 }
 
 [data-design-mode="material"] .wheel-inner circle:nth-of-type(1) {
-    stroke: rgba(0, 0, 0, 0.18);
+    stroke: var(--surface-border);
 }
 
 [data-design-mode="material"] .wheel-inner circle:nth-of-type(2) {
     fill: #FFFFFF;
-    stroke: #111111;
+    stroke: var(--primary);
 }
 
 [data-design-mode="material"] .spark {
-    background: #111111;
+    background: var(--primary);
     box-shadow: none;
-}
-
-/* Logo shown in greyscale to keep the page strictly black & white */
-[data-design-mode="material"] .logo-img {
-    filter: grayscale(1);
 }
 
 [data-design-mode="material"] .spin-cta:hover,
