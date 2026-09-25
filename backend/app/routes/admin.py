@@ -1346,7 +1346,31 @@ def create_guaranteed_win():
                 'success': False,
                 'error': 'prize_id is required'
             }), 400
-        
+
+        # For an immediate (next-spin) guaranteed win, the prize must still
+        # be winnable today - otherwise the win would sit pending and, once
+        # triggered, fail to actually consume any prize (see consume_prize).
+        # Scheduled-for-later wins skip this check since tomorrow's
+        # inventory doesn't exist yet.
+        if not scheduled_at_str:
+            today_inventory = Inventory.get_for_prize(prize_id)
+            if not today_inventory:
+                return jsonify({
+                    'success': False,
+                    'error': 'No inventory configured for this prize today'
+                }), 400
+            if today_inventory['remaining_quantity'] <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'This prize has no remaining quantity today'
+                }), 409
+            wins_today = Transaction.get_wins_today_for_prize(prize_id)
+            if wins_today >= today_inventory['daily_limit']:
+                return jsonify({
+                    'success': False,
+                    'error': 'This prize has already reached its daily limit today'
+                }), 409
+
         # Parse scheduled_at if provided
         scheduled_at = None
         if scheduled_at_str:
