@@ -1031,9 +1031,7 @@
                     <div class="form-group">
                 <label>Category</label>
                             <select id="newPrizeCategory">
-                    <option value="1">Common</option>
-                    <option value="2">Rare</option>
-                    <option value="3">Ultra Rare</option>
+                                <option value="">Loading categories...</option>
                             </select>
                     </div>
                     <div class="form-group">
@@ -1486,6 +1484,52 @@
         let prizesData = [];
         let categoriesData = [];
 
+        // Escapes admin-entered text (prize/event/template names,
+        // descriptions, reasons) before it's interpolated into innerHTML.
+        // These fields are free text saved by whoever has the admin
+        // password - without this, a name like <img src=x onerror=...>
+        // runs as script in the admin panel of anyone who views it.
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value === null || value === undefined ? '' : String(value);
+            return div.innerHTML;
+        }
+
+        // Formats a Date as a local YYYY-MM-DD string. toISOString() converts
+        // to UTC first, which reports the wrong calendar date for roughly
+        // the first 5.5 hours of every IST business day (IST is UTC+5:30) -
+        // use this instead wherever a date-only value (not a timestamp) is
+        // needed, e.g. defaulting a date picker to "today".
+        function toLocalDateString(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Same fix as toLocalDateString, for <input type="datetime-local">
+        // fields: they expect local wall-clock time, but
+        // toISOString().slice(0,16) gives UTC, which prefilled the wrong
+        // time (off by the UTC offset, e.g. 5:30h in IST) into event/
+        // guaranteed-win scheduling fields.
+        function toLocalDatetimeString(date) {
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${toLocalDateString(date)}T${hours}:${minutes}`;
+        }
+
+        // For admin-entered text embedded inside a single-quoted JS string
+        // literal in an inline onclick="fn('...')" attribute. escapeHtml
+        // alone isn't enough there - a name containing a ' can close the
+        // string early and inject arbitrary JS into the attribute.
+        function escapeJsString(value) {
+            return (value === null || value === undefined ? '' : String(value))
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '&quot;')
+                .replace(/\n/g, '\\n');
+        }
+
         // Tab switching
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1504,7 +1548,7 @@
                 loadEvents();
             }
             if (tab === 'stats') {
-                document.getElementById('statsDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('statsDate').value = toLocalDateString(new Date());
                 loadDetailedStats();
             }
         }
@@ -1649,9 +1693,9 @@
                         <div class="prize-name">
                             <span class="prize-emoji">${prize.emoji || '🎁'}</span>
                             <div class="prize-info">
-                                <h4 class="editable-name" onclick="showEditPrizeNameModal(${prize.id}, '${prize.name.replace(/'/g, "\\'")}')" 
+                                <h4 class="editable-name" onclick="showEditPrizeNameModal(${prize.id}, '${escapeJsString(prize.name)}')"
                                     style="cursor: pointer;" title="Click to edit name">
-                                    ${prize.name} <span style="font-size: 0.7em; opacity: 0.6;">✏️</span>
+                                    ${escapeHtml(prize.name)} <span style="font-size: 0.7em; opacity: 0.6;">✏️</span>
                                 </h4>
                                 <span>ID: ${prize.id}</span>
                             </div>
@@ -1674,7 +1718,8 @@
                         </div>
                     </td>
                     <td>
-                        <input type="number" class="daily-limit-input" value="${prize.daily_limit || 5}" min="1" max="100"
+                        <input type="number" class="daily-limit-input" value="${prize.daily_limit ?? 5}" min="0" max="100"
+                               title="0 disables further wins on this prize for today"
                                style="width: 60px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; text-align: center;"
                                onchange="updateDailyLimit(${prize.id}, this.value)">
                     </td>
@@ -1860,7 +1905,19 @@
         }
 
         // Add Prize
-        function showAddPrizeModal() {
+        async function showAddPrizeModal() {
+            // Categories are loaded from the API rather than hardcoded here,
+            // since their IDs are assigned by the database and don't
+            // reliably match any fixed 1/2/3 ordering (picking the wrong
+            // one silently mis-categorizes the prize - wrong default
+            // inventory, wrong win odds).
+            if (!categoriesData.length) {
+                await loadCategories();
+            }
+            const select = document.getElementById('newPrizeCategory');
+            select.innerHTML = categoriesData.length
+                ? categoriesData.map(c => `<option value="${c.id}">${escapeHtml(c.display_name || c.name)}</option>`).join('')
+                : '<option value="">No categories found</option>';
             document.getElementById('addPrizeModal').classList.add('show');
         }
 
@@ -1941,18 +1998,18 @@
                             <div>
                                 <div class="event-title">
                                     ${isActive ? '<span class="status-dot enabled"></span>' : ''}
-                                    ${event.name}
+                                    ${escapeHtml(event.name)}
                                     ${hasCustomTheme ? '<span style="font-size: 0.7rem; background: var(--primary); color: white; padding: 2px 6px; border-radius: 4px; margin-left: 0.5rem;">🎨 Custom Theme</span>' : ''}
                                 </div>
-                                <span class="event-type">${event.event_type}</span>
+                                <span class="event-type">${escapeHtml(event.event_type)}</span>
                                 </div>
                             <div class="actions-row">
-                                ${hasCustomTheme ? `<button class="btn btn-ghost btn-sm" onclick="resetEventTheme(${event.id}, '${event.name}')" title="Reset Theme">🔄 Reset Theme</button>` : ''}
+                                ${hasCustomTheme ? `<button class="btn btn-ghost btn-sm" onclick="resetEventTheme(${event.id}, '${escapeJsString(event.name)}')" title="Reset Theme">🔄 Reset Theme</button>` : ''}
                                 <label class="toggle" style="margin-right: 0.5rem;">
                                     <input type="checkbox" ${event.is_active ? 'checked' : ''} onchange="toggleEvent(${event.id}, this.checked)">
                                     <span class="toggle-slider"></span>
                                 </label>
-                                <button class="btn btn-danger btn-sm btn-icon" onclick="deleteEvent(${event.id}, '${event.name}')" title="Delete">
+                                <button class="btn btn-danger btn-sm btn-icon" onclick="deleteEvent(${event.id}, '${escapeJsString(event.name)}')" title="Delete">
                                     🗑️
                                 </button>
                                 </div>
@@ -1960,10 +2017,10 @@
                         <div class="event-dates">
                             📅 ${startDate} → ${endDate}
                             </div>
-                        ${event.description ? `<p style="font-size: 0.875rem; color: var(--text-secondary);">${event.description}</p>` : ''}
+                        ${event.description ? `<p style="font-size: 0.875rem; color: var(--text-secondary);">${escapeHtml(event.description)}</p>` : ''}
                         ${event.prizes ? `
                             <div class="event-prizes">
-                                ${event.prizes.map(p => `<span class="event-prize-tag">${p.emoji || '🎁'} ${p.prize_name}</span>`).join('')}
+                                ${event.prizes.map(p => `<span class="event-prize-tag">${p.emoji || '🎁'} ${escapeHtml(p.prize_name)}</span>`).join('')}
                             </div>
                         ` : ''}
                             </div>
@@ -1984,8 +2041,8 @@
             const tomorrow = new Date(now);
             tomorrow.setDate(tomorrow.getDate() + 1);
             
-            document.getElementById('eventStart').value = now.toISOString().slice(0, 16);
-            document.getElementById('eventEnd').value = tomorrow.toISOString().slice(0, 16);
+            document.getElementById('eventStart').value = toLocalDatetimeString(now);
+            document.getElementById('eventEnd').value = toLocalDatetimeString(tomorrow);
             
             // Reset theme form
             resetThemeForm();
@@ -1997,7 +2054,7 @@
                 <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; cursor: pointer; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
                     <input type="checkbox" value="${prize.prize_id || prize.id}" class="event-prize-checkbox" style="width: auto;">
                     <span style="font-size: 1.2rem;">${prize.emoji || '🎁'}</span>
-                    <span style="flex: 1;">${prize.name}</span>
+                    <span style="flex: 1;">${escapeHtml(prize.name)}</span>
                     <span class="badge badge-${prize.category_name}">${prize.category_display || prize.category_name}</span>
                 </label>
             `).join('') : '<p style="color: var(--text-secondary);">No rare/ultra rare prizes available</p>';
@@ -2277,8 +2334,8 @@
                 const startDate = new Date(adjustedYear, event.startMonth - 1, event.startDay, 0, 0);
                 const endDate = new Date(endYear, event.endMonth - 1, event.endDay, 23, 59);
                 
-                document.getElementById('eventStart').value = startDate.toISOString().slice(0, 16);
-                document.getElementById('eventEnd').value = endDate.toISOString().slice(0, 16);
+                document.getElementById('eventStart').value = toLocalDatetimeString(startDate);
+                document.getElementById('eventEnd').value = toLocalDatetimeString(endDate);
                 
                 // Apply theme preset
                 if (event.theme !== 'custom') {
@@ -2369,7 +2426,7 @@
                     
                     let defaultTemplateId = null;
                     templatesData.forEach(t => {
-                        selector.innerHTML += `<option value="${t.id}">${t.name}${t.is_default ? ' (Default)' : ''}</option>`;
+                        selector.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)}${t.is_default ? ' (Default)' : ''}</option>`;
                         if (t.is_default) {
                             defaultTemplateId = t.id;
                         }
@@ -2434,7 +2491,7 @@
                             <tr>
                                 <td class="prize-name">
                                     <span class="prize-emoji">${p.emoji || '🎁'}</span>
-                                    <span id="prize-name-${p.prize_id}">${p.prize_name}</span>
+                                    <span id="prize-name-${p.prize_id}">${escapeHtml(p.prize_name)}</span>
                                     <button class="btn-icon-tiny" onclick="showEditTemplatePrizeModal(${p.prize_id}, '${p.prize_name.replace(/'/g, "\\'")}', '${p.emoji || '🎁'}')" title="Edit prize name">✏️</button>
                                 </td>
                                 <td><span class="badge badge-${p.category_name}">${p.category_name}</span></td>
@@ -2446,7 +2503,7 @@
                                         <button class="qty-btn plus" onclick="updateTemplatePrizeQty(${p.id}, ${p.quantity + 1})">+</button>
                                     </div>
                                 </td>
-                                <td>${p.daily_limit || '∞'}</td>
+                                <td>${p.daily_limit === null || p.daily_limit === undefined ? '∞' : p.daily_limit}</td>
                                 <td>
                                     <label class="toggle">
                                         <input type="checkbox" ${p.is_enabled ? 'checked' : ''} 
@@ -2710,7 +2767,7 @@
                 return;
             }
             
-            const today = new Date().toISOString().split('T')[0];
+            const today = toLocalDateString(new Date());
             document.getElementById('assignStartDate').value = today;
             document.getElementById('assignEndDate').value = today;
             document.getElementById('assignSingleDate').value = today;
@@ -2767,7 +2824,7 @@
                 const endDate = new Date(today);
                 endDate.setDate(endDate.getDate() + 30);
                 
-                const data = await apiGet(`/admin/date-assignments?start_date=${today.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}`);
+                const data = await apiGet(`/admin/date-assignments?start_date=${toLocalDateString(today)}&end_date=${toLocalDateString(endDate)}`);
                 
                 if (data.success) {
                     if (data.assignments && data.assignments.length) {
@@ -2777,7 +2834,7 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
                                     <div>
                                         <strong>${new Date(a.target_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
-                                        <span style="color: var(--text-secondary); margin-left: 0.5rem;">${a.template_name}</span>
+                                        <span style="color: var(--text-secondary); margin-left: 0.5rem;">${escapeHtml(a.template_name)}</span>
                                         ${a.notes ? `<span style="font-size: 0.75rem; color: var(--accent); margin-left: 0.5rem;">(${a.notes})</span>` : ''}
                                     </div>
                                     <button class="btn btn-danger btn-sm btn-icon" onclick="unassignDate('${a.target_date}')">🗑️</button>
@@ -2855,14 +2912,14 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid ${isNextSpin ? 'var(--success)' : 'var(--warning)'};">
                         <div>
                             <span style="font-size: 1.2rem; margin-right: 0.5rem;">${w.prize_emoji || '🎁'}</span>
-                            <strong>${w.prize_name}</strong>
+                            <strong>${escapeHtml(w.prize_name)}</strong>
                             <span class="badge badge-${w.category_name}" style="margin-left: 0.5rem;">${w.category_name}</span>
                             ${progressInfo}
                             <br>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">
                                 ${isNextSpin ? '🔥 Next Spin' : `📅 ${new Date(w.scheduled_at).toLocaleString()}`}
-                                ${w.target_identifier ? ` | For: ${w.target_identifier}` : ''}
-                                ${w.reason ? ` | ${w.reason}` : ''}
+                                ${w.target_identifier ? ` | For: ${escapeHtml(w.target_identifier)}` : ''}
+                                ${w.reason ? ` | ${escapeHtml(w.reason)}` : ''}
                             </span>
                             ${expiryInfo}
                         </div>
@@ -2890,7 +2947,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; opacity: 0.7;">
                         <div>
                             <span style="font-size: 1.2rem; margin-right: 0.5rem;">${w.prize_emoji || '🎁'}</span>
-                            <strong>${w.prize_name}</strong>
+                            <strong>${escapeHtml(w.prize_name)}</strong>
                             <br>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">
                                 ✅ ${new Date(w.triggered_at).toLocaleString()}
@@ -2937,7 +2994,7 @@
                 const tomorrow = new Date();
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 tomorrow.setHours(12, 0, 0, 0);
-                document.getElementById('scheduleDateTime').value = tomorrow.toISOString().slice(0, 16);
+                document.getElementById('scheduleDateTime').value = toLocalDatetimeString(tomorrow);
             }
         }
         
@@ -3088,7 +3145,7 @@
                                     ${transData.transactions.map(t => `
                                         <tr>
                                             <td>${new Date(t.created_at).toLocaleTimeString()}</td>
-                                            <td>${t.emoji || '🎁'} ${t.prize_name}</td>
+                                            <td>${t.emoji || '🎁'} ${escapeHtml(t.prize_name)}</td>
                                             <td><span class="badge badge-${t.category_name}">${t.category_name}</span></td>
                                             <td style="font-family: monospace; font-size: 0.8rem;">${(t.user_identifier || 'Anonymous').substring(0, 20)}</td>
                     </tr>
