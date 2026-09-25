@@ -918,24 +918,24 @@ def update_default_theme():
 @admin_bp.route('/settings/default-theme/reset', methods=['POST'])
 @require_admin_auth
 def reset_default_theme_to_factory():
-    """Reset default theme to factory settings (Magenta Pink)"""
+    """Reset default theme to factory settings (Neon Magenta)"""
     from ..database import set_setting
     try:
         factory_theme = {
             "name": "default",
             "background": {
                 "type": "gradient",
-                "colors": ["#E20074", "#FFF5F8", "#FF4D9F"],
+                "colors": ["#E50065", "#09070A", "#650A2C"],
                 "style": "radial"
             },
             "wheel": {
-                "colors": ["#E20074", "#FF4D9F", "#B8005D", "#FF80B5", "#9E0052", "#FF66A3"],
-                "borderColor": "#B8005D",
+                "colors": ["#1B0510", "#E50065", "#2A0716", "#FF4FA3", "#22040F", "#FF2B86"],
+                "borderColor": "#FF2B86",
                 "textColor": "#FFFFFF"
             },
             "header": {
-                "backgroundColor": "#E20074",
-                "gradientEnd": "#B8005D",
+                "backgroundColor": "#16050D",
+                "gradientEnd": "#650A2C",
                 "textColor": "#FFFFFF",
                 "title": "SPIN & WIN",
                 "subtitle": "Win Exciting Prizes!"

@@ -6,22 +6,23 @@
 class ThemeManager {
     constructor() {
         this.apiBaseUrl = '/api';
-        // Default theme: Magenta Pink (#E20074) with Soft White (#FFF5F8)
+        // Default theme: Neon Magenta - near-black base, deep burgundy bloom,
+        // hot-pink accents
         this.defaultTheme = {
             name: 'default',
             background: {
                 type: 'gradient',
-                colors: ['#E20074', '#FFF5F8', '#FF4D9F'],
+                colors: ['#E50065', '#09070A', '#650A2C'],
                 style: 'radial'
             },
             wheel: {
-                colors: ['#E20074', '#FF4D9F', '#B8005D', '#FF80B5', '#9E0052', '#FF66A3'],
-                borderColor: '#B8005D',
+                colors: ['#1B0510', '#E50065', '#2A0716', '#FF4FA3', '#22040F', '#FF2B86'],
+                borderColor: '#FF2B86',
                 textColor: '#FFFFFF'
             },
             header: {
-                backgroundColor: '#E20074',
-                gradientEnd: '#B8005D',
+                backgroundColor: '#16050D',
+                gradientEnd: '#650A2C',
                 textColor: '#FFFFFF',
                 title: 'SPIN & WIN',
                 subtitle: 'Win Exciting Prizes!'
@@ -123,6 +124,16 @@ class ThemeManager {
      * Apply background styling
      */
     applyBackground() {
+        // Material design mode owns the background entirely via CSS (flat,
+        // no per-event glow) - clear any inline style a previous Neon-mode
+        // apply left behind instead of fighting it.
+        if (document.documentElement.dataset.designMode === 'material') {
+            document.body.style.background = '';
+            document.body.style.backgroundColor = '';
+            document.body.style.backgroundAttachment = '';
+            return;
+        }
+
         const theme = this.activeTheme;
         const body = document.body;
 
@@ -133,15 +144,21 @@ class ThemeManager {
                 const colors = bg.colors;
                 
                 if (bg.style === 'radial') {
-                    // Watercolor-inspired radial gradient
+                    // Cinematic stage: the theme's base color (colors[1]) with a
+                    // deep ambient bloom (colors[2]) and faint accent (colors[0])
+                    // glows up top. The strong glow behind the wheel itself is a
+                    // CSS layer on .wheel-container so it follows the wheel.
+                    // Works for a light base (older pastel themes) too.
+                    const base = colors[1] || colors[2] || colors[0];
+                    const deep = colors[2] || colors[0];
                     body.style.background = `
-                        radial-gradient(ellipse at 0% 0%, ${this.hexToRgba(colors[0], 0.4)} 0%, transparent 50%),
-                        radial-gradient(ellipse at 100% 0%, ${this.hexToRgba(colors[0], 0.3)} 0%, transparent 40%),
-                        radial-gradient(ellipse at 0% 100%, ${this.hexToRgba(colors[2] || colors[0], 0.4)} 0%, transparent 50%),
-                        radial-gradient(ellipse at 100% 100%, ${this.hexToRgba(colors[2] || colors[0], 0.3)} 0%, transparent 40%),
-                        radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 248, 240, 0.9) 100%)
+                        radial-gradient(ellipse 70% 55% at 50% 42%, ${this.hexToRgba(deep, 0.55)} 0%, transparent 70%),
+                        radial-gradient(ellipse 45% 35% at 12% 8%, ${this.hexToRgba(colors[0], 0.14)} 0%, transparent 70%),
+                        radial-gradient(ellipse 45% 35% at 88% 8%, ${this.hexToRgba(colors[0], 0.12)} 0%, transparent 70%),
+                        radial-gradient(ellipse 60% 30% at 50% 100%, ${this.hexToRgba(deep, 0.35)} 0%, transparent 70%),
+                        ${base}
                     `;
-                    body.style.backgroundColor = '#FFF8F0';
+                    body.style.backgroundColor = base;
                 } else if (bg.style === 'linear') {
                     // Linear gradient (like tricolor)
                     body.style.background = `linear-gradient(180deg, ${colors.join(', ')})`;
@@ -166,28 +183,40 @@ class ThemeManager {
      */
     applyHeader() {
         const theme = this.activeTheme;
-        
+        const isMaterial = document.documentElement.dataset.designMode === 'material';
+
         if (theme.header) {
             const header = theme.header;
-            
-            // Update header navigation background
+
+            // Header panel tint. Translucent so it reads as glass over the
+            // stage; Material mode keeps its own flat card background from
+            // CSS, so clear any leftover inline gradient there.
             const topNav = document.querySelector('.top-nav');
             if (topNav) {
-                topNav.style.background = `linear-gradient(135deg, ${header.backgroundColor || '#FF9933'}, ${header.gradientEnd || '#E67300'})`;
+                topNav.style.background = isMaterial ? '' :
+                    `linear-gradient(135deg, ${this.hexToRgba(header.backgroundColor, 0.72)}, ${this.hexToRgba(header.gradientEnd, 0.5)})`;
             }
 
-            // Update title text
+            // Title: last word gets the accent treatment ("SPIN & " + "WIN").
+            // Built from text nodes, never innerHTML - the title comes from
+            // admin-editable theme data.
             const mainTitle = document.querySelector('.main-title');
             if (mainTitle && header.title) {
-                mainTitle.textContent = `🎉 ${header.title} 🎊`;
-                mainTitle.style.color = header.textColor || '#FFFFFF';
+                const title = header.title.trim();
+                const split = title.lastIndexOf(' ');
+                const lead = document.createElement('span');
+                lead.className = 'title-lead';
+                lead.textContent = split > 0 ? title.slice(0, split + 1) : '';
+                const accent = document.createElement('span');
+                accent.className = 'title-accent';
+                accent.textContent = split > 0 ? title.slice(split + 1) : title;
+                mainTitle.replaceChildren(lead, accent);
             }
 
-            // Update subtitle
+            // Subtitle (sparkles only in Neon; CSS owns the colors)
             const subtitle = document.querySelector('.subtitle');
             if (subtitle && header.subtitle) {
-                subtitle.textContent = `✨ ${header.subtitle} ✨`;
-                subtitle.style.color = header.textColor || '#FFFFFF';
+                subtitle.textContent = isMaterial ? header.subtitle : `✨ ${header.subtitle} ✨`;
             }
         }
     }

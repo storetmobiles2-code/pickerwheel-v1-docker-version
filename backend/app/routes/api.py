@@ -15,21 +15,22 @@ logger = logging.getLogger(__name__)
 api_bp = Blueprint('api', __name__)
 
 # Fallback default theme (used if database has no theme)
+# Neon Magenta - dark maroon/black base with a hot-pink glow
 FALLBACK_DEFAULT_THEME = {
     "name": "default",
     "background": {
         "type": "gradient",
-        "colors": ["#E20074", "#FFF5F8", "#FF4D9F"],
+        "colors": ["#E50065", "#09070A", "#650A2C"],
         "style": "radial"
     },
     "wheel": {
-        "colors": ["#E20074", "#FF4D9F", "#B8005D", "#FF80B5", "#9E0052", "#FF66A3"],
-        "borderColor": "#B8005D",
+        "colors": ["#1B0510", "#E50065", "#2A0716", "#FF4FA3", "#22040F", "#FF2B86"],
+        "borderColor": "#FF2B86",
         "textColor": "#FFFFFF"
     },
     "header": {
-        "backgroundColor": "#E20074",
-        "gradientEnd": "#B8005D",
+        "backgroundColor": "#16050D",
+        "gradientEnd": "#650A2C",
         "textColor": "#FFFFFF",
         "title": "SPIN & WIN",
         "subtitle": "Win Exciting Prizes!"
