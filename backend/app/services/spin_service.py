@@ -166,17 +166,21 @@ class SpinService:
         """
         if target_date is None:
             target_date = date.today()
-        
-        # If this is a guaranteed win, mark it as triggered
-        if guaranteed_win_id:
-            GuaranteedWin.trigger(guaranteed_win_id, user_identifier)
-            logger.info(f"Triggered guaranteed win (ID: {guaranteed_win_id}) for user {user_identifier}")
-        
-        # Use the consume_prize function for atomic operation
-        results = execute_function('consume_prize', prize_id, event_id, user_identifier, '{}')
-        
+
+        # Consume the prize and (if applicable) complete the guaranteed win
+        # atomically in one DB call: consume_prize() only marks the
+        # guaranteed win as triggered after the inventory decrement and
+        # transaction insert succeed, so a depleted/limited prize can never
+        # leave a guaranteed win spent with nothing awarded.
+        results = execute_function(
+            'consume_prize', prize_id, event_id, user_identifier, '{}', guaranteed_win_id
+        )
+
         if not results or not results[0]['success']:
-            logger.warning(f"Failed to consume prize {prize_id}")
+            logger.warning(
+                f"Failed to consume prize {prize_id}" +
+                (f" for guaranteed win {guaranteed_win_id}" if guaranteed_win_id else "")
+            )
             return {
                 'success': False,
                 'error': 'Prize no longer available'
