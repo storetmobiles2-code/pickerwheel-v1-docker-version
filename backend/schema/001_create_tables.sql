@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS prizes (
     is_active BOOLEAN DEFAULT TRUE,
     is_enabled BOOLEAN DEFAULT TRUE,  -- Controls if prize can be won (shown but excluded from spin)
     display_order INTEGER DEFAULT 0,
+    budget_tier VARCHAR(20) NOT NULL DEFAULT 'budget'
+        CHECK (budget_tier IN ('budget', 'mid_budget', 'high_end')),  -- Admin-panel price grouping, independent of category/rarity
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -137,3 +139,4 @@ COMMENT ON TABLE prizes IS 'Prize definitions with is_enabled for excluding from
 COMMENT ON COLUMN prizes.is_enabled IS 'When FALSE, prize shows on wheel but cannot be won';
 COMMENT ON COLUMN prizes.is_active IS 'When FALSE, prize is completely hidden from wheel';
 COMMENT ON COLUMN prizes.display_order IS 'Order of prize on the wheel (lower = first)';
+COMMENT ON COLUMN prizes.budget_tier IS 'Admin-panel price grouping (budget/mid_budget/high_end), independent of category/rarity odds';

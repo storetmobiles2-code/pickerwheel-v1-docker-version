@@ -48,6 +48,7 @@ class Inventory:
             SELECT pi.id, pi.prize_id, pi.event_id, pi.available_date,
                    pi.initial_quantity, pi.remaining_quantity, pi.daily_limit,
                    p.name as prize_name, p.emoji, p.is_enabled, p.is_active,
+                   p.budget_tier,
                    pc.name as category_name, pc.display_name as category_display,
                    COALESCE(tw.wins_today, 0) as wins_today
             FROM prize_inventory pi

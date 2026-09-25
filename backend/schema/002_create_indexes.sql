@@ -10,6 +10,7 @@ CREATE INDEX IF NOT EXISTS idx_prizes_active ON prizes(is_active) WHERE is_activ
 CREATE INDEX IF NOT EXISTS idx_prizes_enabled ON prizes(is_enabled) WHERE is_enabled = TRUE;
 CREATE INDEX IF NOT EXISTS idx_prizes_display_order ON prizes(display_order);
 CREATE INDEX IF NOT EXISTS idx_prizes_active_enabled ON prizes(is_active, is_enabled);
+CREATE INDEX IF NOT EXISTS idx_prizes_budget_tier ON prizes(budget_tier);
 
 -- =====================================================
 -- PRIZE INVENTORY INDEXES

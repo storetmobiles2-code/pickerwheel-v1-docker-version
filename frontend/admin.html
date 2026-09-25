@@ -497,6 +497,38 @@
             color: #a855f7;
         }
 
+        /* Budget Tier Badges (admin-panel price grouping, independent of rarity) */
+        .badge-budget {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .badge-mid_budget {
+            background: rgba(251, 191, 36, 0.15);
+            color: #d97706;
+        }
+
+        .badge-high_end {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .tier-select {
+            border: none;
+            border-radius: 999px;
+            padding: 0.25rem 1.75rem 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 0.6rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+        }
+
         /* Status Indicator */
         .status-dot {
             width: 8px;
@@ -781,6 +813,12 @@
                         <div class="actions-row">
                             <button class="btn btn-primary btn-sm" onclick="showAddPrizeModal()">➕ Add Prize</button>
                             <button class="btn btn-ghost btn-sm" onclick="loadPrizes()">🔄 Refresh</button>
+                            <select id="tierFilter" class="tier-select" style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); margin-left: auto;" onchange="renderPrizesTable()">
+                                <option value="all">All Tiers</option>
+                                <option value="budget">🟢 Budget</option>
+                                <option value="mid_budget">🟡 Mid-Budget</option>
+                                <option value="high_end">🔴 High-End</option>
+                            </select>
                 </div>
             </div>
                     <div style="overflow-x: auto;">
@@ -789,6 +827,7 @@
                                 <tr>
                                     <th>Prize</th>
                                     <th>Category</th>
+                                    <th>Budget Tier</th>
                                     <th>Quantity</th>
                                     <th>Daily Limit</th>
                                     <th>Wins Today</th>
@@ -1018,6 +1057,17 @@
                     <option value="2">Rare</option>
                     <option value="3">Ultra Rare</option>
                             </select>
+                    </div>
+                    <div class="form-group">
+                <label>Budget Tier</label>
+                <select id="newPrizeBudgetTier">
+                    <option value="budget">🟢 Budget</option>
+                    <option value="mid_budget">🟡 Mid-Budget</option>
+                    <option value="high_end">🔴 High-End</option>
+                </select>
+                <p style="color: var(--text-secondary); margin-top: 0.4rem; font-size: 0.75rem;">
+                    Admin-panel price grouping only — does not affect win odds.
+                </p>
                     </div>
                     <div class="form-group">
                 <label>Emoji</label>
@@ -1683,6 +1733,7 @@
                         emoji: item.emoji || '🎁',
                         category_name: item.category_name,
                         category_display: item.category_display,
+                        budget_tier: item.budget_tier || 'budget',
                         is_enabled: item.is_enabled,
                         is_active: item.is_active,
                         remaining_quantity: item.remaining_quantity,
@@ -1698,15 +1749,22 @@
             }
         }
 
+        const TIER_LABELS = { budget: '🟢 Budget', mid_budget: '🟡 Mid-Budget', high_end: '🔴 High-End' };
+
         function renderPrizesTable(prizes) {
             const tbody = document.getElementById('prizesTableBody');
-            
-            if (!prizes.length) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No prizes found</td></tr>`;
+
+            if (!prizes) prizes = prizesData;
+
+            const tierFilter = document.getElementById('tierFilter')?.value || 'all';
+            const filtered = tierFilter === 'all' ? prizes : prizes.filter(p => p.budget_tier === tierFilter);
+
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No prizes found</td></tr>`;
                 return;
             }
-            
-            tbody.innerHTML = prizes.map(prize => `
+
+            tbody.innerHTML = filtered.map(prize => `
                 <tr>
                     <td>
                         <div class="prize-name">
@@ -1722,6 +1780,11 @@
                     </td>
                     <td>
                         <span class="badge badge-${prize.category_name}">${prize.category_display || prize.category_name}</span>
+                    </td>
+                    <td>
+                        <select class="tier-select badge-${prize.budget_tier}" onchange="updatePrizeTier(${prize.id}, this.value)" title="Admin-panel price grouping - does not affect win odds">
+                            ${Object.entries(TIER_LABELS).map(([value, label]) => `<option value="${value}" ${prize.budget_tier === value ? 'selected' : ''}>${label}</option>`).join('')}
+                        </select>
                     </td>
                     <td>
                         <div class="qty-control">
@@ -1893,6 +1956,25 @@
             }
         }
 
+        // Update Budget Tier (admin-panel price grouping only - no effect on rarity/win odds)
+        async function updatePrizeTier(prizeId, tier) {
+            try {
+                const data = await apiPut(`/admin/prizes/${prizeId}`, { budget_tier: tier });
+                if (data.success) {
+                    const prize = prizesData.find(p => p.id === prizeId);
+                    if (prize) prize.budget_tier = tier;
+                    showToast('Budget tier updated', 'success');
+                    renderPrizesTable();
+                } else {
+                    showToast(data.error || 'Failed to update budget tier', 'error');
+                    loadPrizes();
+                }
+            } catch (error) {
+                showToast('Error updating budget tier', 'error');
+                loadPrizes();
+            }
+        }
+
         // Add Prize
         function showAddPrizeModal() {
             document.getElementById('addPrizeModal').classList.add('show');
@@ -1901,19 +1983,21 @@
         async function addPrize() {
             const name = document.getElementById('newPrizeName').value.trim();
             const categoryId = parseInt(document.getElementById('newPrizeCategory').value);
+            const budgetTier = document.getElementById('newPrizeBudgetTier').value;
             const emoji = document.getElementById('newPrizeEmoji').value || '🎁';
             const quantity = parseInt(document.getElementById('newPrizeQuantity').value);
             const dailyLimit = parseInt(document.getElementById('newPrizeDailyLimit').value);
-            
+
             if (!name) {
                 showToast('Please enter a prize name', 'error');
                 return;
             }
-            
+
             try {
                 const data = await apiPost('/admin/prizes', {
                     name,
                     category_id: categoryId,
+                    budget_tier: budgetTier,
                     emoji,
                     initial_quantity: quantity,
                     daily_limit: dailyLimit
