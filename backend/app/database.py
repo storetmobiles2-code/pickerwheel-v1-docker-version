@@ -77,6 +77,38 @@ def execute_sql(sql, params=None):
         return None
 
 
+def execute_transaction(operations):
+    """
+    Execute several (sql, params) statements in a single transaction.
+    All statements commit together or none do - use this instead of
+    multiple execute_sql() calls whenever a route needs more than one
+    write to land atomically.
+    Returns a list of results (list[dict] or None) in the same order
+    as `operations`.
+    """
+    with session_scope() as session:
+        results = []
+        for sql, params in operations:
+            result = session.execute(text(sql), params or {})
+            if result.returns_rows:
+                results.append([dict(row._mapping) for row in result])
+            else:
+                results.append(None)
+        return results
+
+
+def run_in_transaction(fn):
+    """
+    Run fn(session) inside a single transaction and return its result.
+    Use this (instead of execute_transaction) when a later write needs a
+    value produced by an earlier one in the same transaction - e.g.
+    inserting child rows that reference the id a preceding INSERT just
+    generated - so the whole sequence commits or rolls back together.
+    """
+    with session_scope() as session:
+        return fn(session)
+
+
 def execute_function(func_name, *args):
     """Execute a PostgreSQL function"""
     with session_scope() as session:

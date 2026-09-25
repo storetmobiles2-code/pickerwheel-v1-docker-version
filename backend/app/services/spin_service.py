@@ -8,7 +8,7 @@ import logging
 import random
 from datetime import date
 from ..database import execute_sql, session_scope, execute_function
-from ..models import Prize, Inventory, Transaction, GuaranteedWin, DateTemplateAssignment
+from ..models import Prize, Inventory, Transaction, GuaranteedWin, DateTemplateAssignment, SpecialEvent
 from .realtime_service import RealtimeService
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,18 @@ class SpinService:
             target_date = date.today()
         
         # Priority 1: Check for guaranteed win
-        guaranteed_win = GuaranteedWin.get_pending(user_identifier)
+        guaranteed_win = GuaranteedWin.get_pending(user_identifier, event_id)
         if guaranteed_win:
             logger.info(f"Guaranteed win found: {guaranteed_win['prize_name']} (Win ID: {guaranteed_win['win_id']})")
             # Get full prize details
             prize = Prize.get_by_id(guaranteed_win['prize_id'])
             if prize:
+                # Report the prize's real remaining quantity rather than a
+                # hardcoded 1, so callers inspecting this value (e.g. admin
+                # debugging tools) see actual inventory state, not a
+                # guaranteed-win placeholder.
+                inventory = Inventory.get_for_prize(prize['id'], event_id, target_date)
+                remaining_quantity = inventory['remaining_quantity'] if inventory else 0
                 # Return in the same format as regular prizes
                 return {
                     'prize_id': prize['id'],
@@ -60,7 +66,7 @@ class SpinService:
                     'emoji': prize['emoji'],
                     'category_name': prize['category_name'],
                     'category_display': prize.get('category_display', prize['category_name']),
-                    'remaining_quantity': 1,  # Guaranteed, so always 1
+                    'remaining_quantity': remaining_quantity,
                     'is_guaranteed': True,
                     'guaranteed_win_id': guaranteed_win['win_id']
                 }
@@ -96,12 +102,20 @@ class SpinService:
         
         if not categories:
             return None
-        
+
         # Select category
         selected_category = random.choices(categories, weights=category_weights, k=1)[0]
-        
-        # Select prize from category (weighted by remaining quantity)
-        weights = [max(1, p['remaining_quantity']) for p in selected_category]
+
+        # Select prize from category, weighted by remaining quantity and
+        # any active special-event weight_multiplier boost for that prize
+        boosted_weights = {
+            b['prize_id']: float(b['weight_multiplier'])
+            for b in SpecialEvent.get_boosted_prize_ids()
+        }
+        weights = [
+            max(1, p['remaining_quantity']) * boosted_weights.get(p['prize_id'], 1.0)
+            for p in selected_category
+        ]
         selected_prize = random.choices(selected_category, weights=weights, k=1)[0]
         
         logger.info(f"Selected prize: {selected_prize['name']} ({selected_prize['category_name']})")

@@ -331,12 +331,12 @@ class GuaranteedWin:
         return execute_sql(sql, params) or []
     
     @staticmethod
-    def get_pending(user_identifier=None):
+    def get_pending(user_identifier=None, event_id=1):
         """Get pending guaranteed wins (for spin selection)"""
         sql = """
-            SELECT * FROM get_pending_guaranteed_win(:user_identifier)
+            SELECT * FROM get_pending_guaranteed_win(:user_identifier, :event_id)
         """
-        results = execute_sql(sql, {'user_identifier': user_identifier})
+        results = execute_sql(sql, {'user_identifier': user_identifier, 'event_id': event_id})
         return results[0] if results else None
     
     @staticmethod
@@ -387,46 +387,15 @@ class GuaranteedWin:
             return results[0]
         return None
     
-    @staticmethod
-    def trigger(win_id, triggered_by_user=None):
-        """
-        Trigger a guaranteed win - increments triggered_count.
-        If triggered_count >= max_triggers, marks as 'triggered' (completed).
-        Otherwise, keeps status as 'pending' for future triggers.
-        """
-        # First, increment the triggered_count
-        sql = """
-            UPDATE guaranteed_wins
-            SET triggered_count = triggered_count + 1,
-                triggered_at = CURRENT_TIMESTAMP,
-                triggered_by_user = :triggered_by,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :win_id AND status = 'pending'
-            RETURNING id, prize_id, triggered_count, max_triggers, triggered_at, triggered_by_user
-        """
-        results = execute_sql(sql, {'win_id': win_id, 'triggered_by': triggered_by_user})
-        
-        if results:
-            result = results[0]
-            triggered_count = result.get('triggered_count', 1)
-            max_triggers = result.get('max_triggers', 1)
-            
-            # Check if we've reached the max triggers
-            if max_triggers is not None and triggered_count >= max_triggers:
-                # Mark as completed (triggered)
-                complete_sql = """
-                    UPDATE guaranteed_wins
-                    SET status = 'triggered', updated_at = CURRENT_TIMESTAMP
-                    WHERE id = :win_id
-                """
-                execute_sql(complete_sql, {'win_id': win_id})
-                logger.info(f"Guaranteed win (ID: {win_id}) completed - {triggered_count}/{max_triggers} triggers by {triggered_by_user}")
-            else:
-                logger.info(f"Triggered guaranteed win (ID: {win_id}) - {triggered_count}/{max_triggers or '∞'} by {triggered_by_user}")
-            
-            return result
-        return None
-    
+    # NOTE: guaranteed wins are completed exclusively through
+    # consume_prize()'s p_guaranteed_win_id parameter (see
+    # backend/schema/007_guaranteed_win_atomic_fix.sql), which only marks a
+    # win triggered after its prize is actually consumed in the same
+    # transaction. There is deliberately no standalone "mark triggered"
+    # model method here anymore - one used to exist and let a win be
+    # marked spent before its prize consumption was confirmed, which is
+    # the exact bug that fix closed. Don't reintroduce it.
+
     @staticmethod
     def cancel(win_id):
         """Cancel a guaranteed win"""

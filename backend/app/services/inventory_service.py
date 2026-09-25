@@ -39,23 +39,31 @@ class InventoryService:
         }
     
     @staticmethod
-    def initialize_inventory_for_prize(prize_id, category_id, event_id=1, 
-                                       start_date=None, days=30):
-        """Initialize inventory for a new prize based on category"""
+    def initialize_inventory_for_prize(prize_id, category_id, event_id=1,
+                                       start_date=None, days=30,
+                                       initial_quantity=None, daily_limit=None):
+        """
+        Initialize inventory for a new prize.
+        Uses the admin-entered initial_quantity/daily_limit when given;
+        otherwise falls back to a category default.
+        """
         if start_date is None:
             start_date = date.today()
-        
-        # Set quantities based on category
-        if category_id == 1:  # ultra_rare
-            initial_quantity = 2
-            daily_limit = 1
-        elif category_id == 2:  # rare
-            initial_quantity = 5
-            daily_limit = 2
-        else:  # common
-            initial_quantity = 10
-            daily_limit = 5
-        
+
+        if initial_quantity is None or daily_limit is None:
+            # Category defaults, only used for whichever value wasn't supplied
+            if category_id == 1:  # ultra_rare
+                default_quantity, default_limit = 2, 1
+            elif category_id == 2:  # rare
+                default_quantity, default_limit = 5, 2
+            else:  # common
+                default_quantity, default_limit = 10, 5
+
+            if initial_quantity is None:
+                initial_quantity = default_quantity
+            if daily_limit is None:
+                daily_limit = default_limit
+
         results = Inventory.create_for_prize_range(
             prize_id, event_id, start_date, days,
             initial_quantity, daily_limit
