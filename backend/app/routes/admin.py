@@ -9,6 +9,9 @@ from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 from ..models import Prize, PrizeCategory, Inventory, Transaction, SpecialEvent, DailyPrizeTemplate, DateTemplateAssignment, GuaranteedWin
 from ..services import InventoryService, SpinService, RealtimeService
+from ..database import execute_transaction, run_in_transaction
+from sqlalchemy import text
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -91,20 +94,37 @@ def add_prize():
                 'error': "budget_tier must be one of 'budget', 'mid_budget', 'high_end'"
             }), 400
 
+        try:
+            initial_quantity = int(initial_quantity)
+            daily_limit = int(daily_limit)
+        except (TypeError, ValueError):
+            return jsonify({
+                'success': False,
+                'error': 'initial_quantity and daily_limit must be integers'
+            }), 400
+        if initial_quantity < 0 or daily_limit < 0:
+            return jsonify({
+                'success': False,
+                'error': 'initial_quantity and daily_limit must be non-negative'
+            }), 400
+
         # Create prize
         prize = Prize.create(name, category_id, emoji, description, display_order, budget_tier)
-        
+
         if not prize:
             return jsonify({
                 'success': False,
                 'error': 'Failed to create prize'
             }), 500
-        
-        # Create inventory for the prize
+
+        # Create inventory for the prize, honoring the admin-entered
+        # quantity/daily-limit instead of silently falling back to
+        # category defaults
         event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
         InventoryService.initialize_inventory_for_prize(
             prize['id'], category_id, event_id,
-            start_date=date.today(), days=30
+            start_date=date.today(), days=30,
+            initial_quantity=initial_quantity, daily_limit=daily_limit
         )
         
         # Get full prize with category info
@@ -276,49 +296,57 @@ def set_inventory(prize_id):
                 'success': False,
                 'error': 'quantity or daily_limit is required'
             }), 400
-        
-        event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
-        
-        target_date_str = data.get('date')
-        if target_date_str:
-            target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
-        else:
-            target_date = date.today()
-        
-        result = None
-        
-        # Update inventory quantity if provided
+
         if quantity is not None:
-            result = InventoryService.set_quantity(prize_id, quantity, event_id, target_date)
-            if not result:
+            try:
+                quantity = int(quantity)
+            except (TypeError, ValueError):
                 return jsonify({
                     'success': False,
-                    'error': 'Inventory not found'
-                }), 404
-        
-        # Update daily limit if provided
+                    'error': 'quantity must be a non-negative integer'
+                }), 400
+            if quantity < 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'quantity must be a non-negative integer'
+                }), 400
+
         if daily_limit is not None:
             try:
                 daily_limit = int(daily_limit)
             except (TypeError, ValueError):
-                daily_limit = -1
+                return jsonify({
+                    'success': False,
+                    'error': 'daily_limit must be a non-negative integer'
+                }), 400
             if daily_limit < 0:
                 return jsonify({
                     'success': False,
                     'error': 'daily_limit must be a non-negative integer'
                 }), 400
 
-            # The date's inventory row is what the admin table shows and what
-            # spins enforce (consume_prize / get_available_prizes)
-            result = Inventory.update_quantity(
-                prize_id, event_id, target_date, daily_limit=daily_limit
-            )
-            if not result:
-                return jsonify({
-                    'success': False,
-                    'error': 'Inventory not found'
-                }), 404
+        event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
 
+        target_date_str = data.get('date')
+        if target_date_str:
+            target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
+        else:
+            target_date = date.today()
+
+        # One UPDATE for both fields so a quantity+daily_limit change lands
+        # atomically instead of as two separate commits that could leave
+        # the row half-updated if the second write failed.
+        result = Inventory.update_quantity(
+            prize_id, event_id, target_date,
+            remaining_quantity=quantity, daily_limit=daily_limit
+        )
+        if not result:
+            return jsonify({
+                'success': False,
+                'error': 'Inventory not found'
+            }), 404
+
+        if daily_limit is not None:
             # Keep the default template in step so future dates populated
             # from it use the same limit. Only the limit changes - the
             # template's quantity and enabled flag are left as configured.
@@ -327,13 +355,12 @@ def set_inventory(prize_id):
                 DailyPrizeTemplate.set_prize_daily_limit(
                     default_template['id'], prize_id, daily_limit
                 )
-
             logger.info(f"Updated daily_limit for prize {prize_id} on {target_date} to {daily_limit}")
-        
+
         # Broadcast update
         if quantity is not None:
             RealtimeService.broadcast_prize_update(prize_id, quantity)
-        
+
         prizes = SpinService.get_wheel_prizes(event_id, target_date)
         RealtimeService.broadcast_prizes_updated(prizes)
         
@@ -362,9 +389,12 @@ def replenish_all():
             target_date = date.today()
         
         results = InventoryService.replenish_all(event_id, target_date)
-        
-        # Broadcast full prize update
-        prizes = Prize.get_all()
+
+        # Broadcast the date-aware wheel prizes (with the refreshed
+        # remaining quantities) rather than Prize.get_all(), which doesn't
+        # carry per-day inventory and left clients showing stale numbers
+        # until they reloaded.
+        prizes = SpinService.get_wheel_prizes(event_id, target_date)
         RealtimeService.broadcast_prizes_updated(prizes)
         
         return jsonify({
@@ -507,27 +537,53 @@ def create_special_event():
                 'error': f'Invalid datetime format: {e}'
             }), 400
         
-        # Create the event
-        event = SpecialEvent.create(name, start_dt, end_dt, event_type, description)
-        
-        if not event:
+        # Create the event, its theme, and its prizes in one transaction -
+        # a failure partway through (e.g. a bad prize_id) used to leave a
+        # half-configured event behind instead of nothing at all.
+        def _create_event_with_prizes(session):
+            result = session.execute(text("""
+                INSERT INTO special_events (name, description, event_type, start_datetime, end_datetime)
+                VALUES (:name, :description, :event_type, :start_dt, :end_dt)
+                RETURNING id
+            """), {
+                'name': name, 'description': description, 'event_type': event_type,
+                'start_dt': start_dt, 'end_dt': end_dt
+            })
+            new_event_id = result.fetchone()[0]
+
+            if theme_config:
+                session.execute(text("""
+                    UPDATE special_events
+                    SET theme_config = :theme_config, updated_at = :now
+                    WHERE id = :event_id
+                """), {
+                    'event_id': new_event_id,
+                    'theme_config': json.dumps(theme_config),
+                    'now': datetime.now()
+                })
+
+            for prize_id in prize_ids:
+                session.execute(text("""
+                    INSERT INTO special_event_prizes (special_event_id, prize_id, boost_enabled, weight_multiplier, quantity_override)
+                    VALUES (:event_id, :prize_id, TRUE, 1.5, NULL)
+                    ON CONFLICT (special_event_id, prize_id) DO NOTHING
+                """), {'event_id': new_event_id, 'prize_id': prize_id})
+
+            return new_event_id
+
+        try:
+            new_event_id = run_in_transaction(_create_event_with_prizes)
+        except Exception as e:
+            logger.error(f"Error creating special event (rolled back): {e}")
             return jsonify({
                 'success': False,
-                'error': 'Failed to create special event'
-            }), 500
-        
-        # Update theme config if provided
-        if theme_config:
-            SpecialEvent.update_theme_config(event['id'], theme_config)
-        
-        # Add prizes to the event
-        for prize_id in prize_ids:
-            SpecialEvent.add_prize(event['id'], prize_id)
-        
+                'error': 'Failed to create special event - check prize_ids are valid'
+            }), 400
+
         # Get full event with prizes
-        full_event = SpecialEvent.get_by_id(event['id'])
-        
-        logger.info(f"Admin created special event: {name} (ID: {event['id']})")
+        full_event = SpecialEvent.get_by_id(new_event_id)
+
+        logger.info(f"Admin created special event: {name} (ID: {new_event_id})")
         
         return jsonify({
             'success': True,
@@ -568,22 +624,29 @@ def update_special_event(event_id):
     try:
         data = request.get_json() or {}
         
-        # Handle datetime parsing
+        # Handle datetime parsing - reject invalid values instead of
+        # silently passing the raw string through to the database
         if 'start_datetime' in data:
             try:
                 data['start_datetime'] = datetime.fromisoformat(
                     data['start_datetime'].replace('Z', '+00:00')
                 )
-            except ValueError:
-                pass
-        
+            except (ValueError, AttributeError):
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid start_datetime format'
+                }), 400
+
         if 'end_datetime' in data:
             try:
                 data['end_datetime'] = datetime.fromisoformat(
                     data['end_datetime'].replace('Z', '+00:00')
                 )
-            except ValueError:
-                pass
+            except (ValueError, AttributeError):
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid end_datetime format'
+                }), 400
         
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
@@ -986,33 +1049,50 @@ def populate_template_with_all_prizes(template_id):
                 'success': False,
                 'error': 'Template not found'
             }), 404
-        
-        # If clear_existing, remove all current prizes from template
-        if clear_existing:
-            DailyPrizeTemplate.clear_prizes(template_id)
-        
+
         # Get all active prizes
         all_prizes = Prize.get_all(include_inactive=False)
-        
+
         if not all_prizes:
             return jsonify({
                 'success': False,
                 'error': 'No active prizes found in database'
             }), 400
-        
-        added_count = 0
+
+        # Clear + repopulate in one transaction, so a failure partway
+        # through can't leave the template with some prizes removed and
+        # only some of the new ones added.
+        operations = []
+        if clear_existing:
+            operations.append((
+                "DELETE FROM template_prizes WHERE template_id = :template_id",
+                {'template_id': template_id}
+            ))
         for prize in all_prizes:
             prize_id = prize.get('id') or prize.get('prize_id')
-            result = DailyPrizeTemplate.add_prize(
-                template_id, 
-                prize_id, 
-                quantity=default_quantity,
-                daily_limit=default_daily_limit,
-                is_enabled=True
-            )
-            if result:
-                added_count += 1
-        
+            operations.append((
+                """
+                INSERT INTO template_prizes (template_id, prize_id, quantity, daily_limit, is_enabled)
+                VALUES (:template_id, :prize_id, :quantity, :daily_limit, :is_enabled)
+                ON CONFLICT (template_id, prize_id)
+                DO UPDATE SET quantity = :quantity, daily_limit = :daily_limit, is_enabled = :is_enabled
+                RETURNING id
+                """,
+                {
+                    'template_id': template_id,
+                    'prize_id': prize_id,
+                    'quantity': default_quantity,
+                    'daily_limit': default_daily_limit,
+                    'is_enabled': True
+                }
+            ))
+
+        results = execute_transaction(operations)
+        # Skip the DELETE's result (it returns no counted rows) when
+        # tallying how many prizes were inserted/updated
+        insert_results = results[1:] if clear_existing else results
+        added_count = sum(1 for r in insert_results if r)
+
         logger.info(f"Admin populated template {template_id} with {added_count} prizes")
         
         # Broadcast update to frontend
@@ -1220,6 +1300,16 @@ def assign_template_to_dates():
         if start_date_str and end_date_str:
             start = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             end = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            if start > end:
+                return jsonify({
+                    'success': False,
+                    'error': 'start_date must not be after end_date'
+                }), 400
+            if (end - start).days > 366:
+                return jsonify({
+                    'success': False,
+                    'error': 'Date range cannot exceed 366 days'
+                }), 400
             results = DateTemplateAssignment.assign_range(start, end, template_id, notes)
         # Handle specific dates
         elif dates:
@@ -1488,25 +1578,42 @@ def cancel_guaranteed_win(win_id):
 @admin_bp.route('/guaranteed-wins/<int:win_id>/trigger-now', methods=['POST'])
 @require_admin_auth
 def trigger_guaranteed_win_now(win_id):
-    """Manually trigger a guaranteed win immediately"""
+    """
+    Manually and immediately fulfil a guaranteed win.
+    Goes through the same atomic consume_prize() path a real spin uses,
+    so it actually awards the prize (decrements inventory, records a
+    transaction) instead of just flipping the win's status with nothing
+    to show for it.
+    """
     try:
         data = request.get_json() or {}
         triggered_by = data.get('triggered_by', 'Admin (Manual)')
-        
-        result = GuaranteedWin.trigger(win_id, triggered_by)
-        
-        if not result:
+
+        win = GuaranteedWin.get_by_id(win_id)
+        if not win or win['status'] != 'pending':
             return jsonify({
                 'success': False,
                 'error': 'Guaranteed win not found or already processed'
             }), 404
-        
+
+        event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
+        result = SpinService.execute_spin(
+            win['prize_id'], triggered_by, event_id, date.today(), win_id
+        )
+
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'error': result.get('error') or 'Prize could not be awarded (out of stock or daily limit reached today)'
+            }), 409
+
         logger.info(f"Admin manually triggered guaranteed win (ID: {win_id})")
-        
+
         return jsonify({
             'success': True,
-            'win': result,
-            'message': 'Guaranteed win triggered manually'
+            'transaction_id': result['transaction_id'],
+            'prize': result['prize'],
+            'message': 'Guaranteed win triggered and prize awarded'
         })
     except Exception as e:
         logger.error(f"Error triggering guaranteed win: {e}")
@@ -1565,50 +1672,54 @@ def reset_daily_wins():
     
     WARNING: This action cannot be undone!
     """
-    from ..database import execute_sql
-    
     try:
         data = request.get_json() or {}
         confirmation = data.get('confirmation', '')
-        
+
         # Require explicit confirmation
         if confirmation != 'RESET':
             return jsonify({
                 'success': False,
                 'error': 'Confirmation required. Send {"confirmation": "RESET"} to proceed.'
             }), 400
-        
+
         # Get today's date
         today = date.today()
-        
-        # Step 1: Count and delete today's win transactions
-        count_sql = """
-            SELECT COUNT(*) as count FROM transactions 
-            WHERE DATE(created_at) = :today AND transaction_type = 'win'
-        """
-        count_result = execute_sql(count_sql, {'today': today})
-        transactions_count = count_result[0]['count'] if count_result else 0
-        
-        delete_sql = """
-            DELETE FROM transactions 
-            WHERE DATE(created_at) = :today AND transaction_type = 'win'
-            RETURNING id
-        """
-        deleted = execute_sql(delete_sql, {'today': today})
-        deleted_count = len(deleted) if deleted else 0
-        
-        # Step 2: Reset inventory for today
-        reset_sql = """
-            UPDATE prize_inventory 
-            SET remaining_quantity = initial_quantity, updated_at = NOW()
-            WHERE available_date = :today
-            RETURNING prize_id, initial_quantity, remaining_quantity
-        """
-        reset_result = execute_sql(reset_sql, {'today': today})
-        inventory_reset_count = len(reset_result) if reset_result else 0
-        
-        # Log the action
         admin_user = request.headers.get('X-Admin-User', 'Admin')
+
+        # Delete + reset + audit record land in one transaction, so a
+        # failure partway through can't delete win history without also
+        # resetting inventory (or vice versa).
+        def _reset(session):
+            deleted = session.execute(text("""
+                DELETE FROM transactions
+                WHERE DATE(created_at) = :today AND transaction_type = 'win'
+                RETURNING id
+            """), {'today': today}).fetchall()
+
+            reset_rows = session.execute(text("""
+                UPDATE prize_inventory
+                SET remaining_quantity = initial_quantity, updated_at = NOW()
+                WHERE available_date = :today
+                RETURNING prize_id, initial_quantity, remaining_quantity
+            """), {'today': today}).fetchall()
+
+            session.execute(text("""
+                INSERT INTO audit_log (action, entity_type, entity_id, old_value, performed_by)
+                VALUES ('reset_daily_wins', 'event', NULL, :old_value, :performed_by)
+            """), {
+                'old_value': json.dumps({
+                    'date': today.isoformat(),
+                    'transactions_deleted': len(deleted),
+                    'inventory_records_reset': len(reset_rows)
+                }),
+                'performed_by': admin_user
+            })
+
+            return len(deleted), len(reset_rows)
+
+        deleted_count, inventory_reset_count = run_in_transaction(_reset)
+
         logger.warning(f"⚠️ DAILY WINS RESET by {admin_user}: Deleted {deleted_count} transactions, reset {inventory_reset_count} inventory records for {today}")
         
         # Broadcast update to refresh frontend
