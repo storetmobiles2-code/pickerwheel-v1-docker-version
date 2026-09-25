@@ -27,34 +27,37 @@ SELECT setval('prize_categories_id_seq', (SELECT MAX(id) FROM prize_categories))
 -- =====================================================
 -- INSERT PRIZES
 -- =====================================================
-INSERT INTO prizes (id, name, category_id, type, emoji, is_active, is_enabled, display_order, description) VALUES 
--- Ultra Rare Prizes (category_id: 1)
-(1, 'Smart TV 32 inches', 1, 'single', '📺', TRUE, TRUE, 1, 'Premium 32-inch Smart TV'),
-(2, 'Silver Coin', 1, 'single', '🪙', TRUE, TRUE, 2, 'Collectible Silver Coin'),
-(3, 'Refrigerator', 1, 'single', '🧊', TRUE, TRUE, 3, 'Energy Efficient Refrigerator'),
-(4, 'Washing Machine', 1, 'single', '🧺', TRUE, TRUE, 4, 'Automatic Washing Machine'),
-(5, 'Air Cooler', 1, 'single', '❄️', TRUE, TRUE, 5, 'High Performance Air Cooler'),
-(6, 'Boult 60W Soundbar', 1, 'single', '🔊', TRUE, TRUE, 6, 'Premium 60W Soundbar'),
+-- Prizes are grouped into two independent classifications:
+--   category_id  -> rarity / spin win-odds bucket (1=ultra_rare 15%, 2=rare 35%, 3=common 50%)
+--   budget_tier  -> admin-panel price grouping only (budget/mid_budget/high_end), no effect on odds or wheel rendering
+INSERT INTO prizes (id, name, category_id, type, emoji, is_active, is_enabled, display_order, budget_tier, description) VALUES
+-- High-End Prizes (category_id: 1 / ultra_rare, budget_tier: high_end)
+(1, 'Air Cooler', 1, 'single', '❄️', TRUE, TRUE, 1, 'high_end', 'High Performance Air Cooler'),
+(2, '32-inch TV', 1, 'single', '📺', TRUE, TRUE, 2, 'high_end', 'Premium 32-inch Smart TV'),
+(3, 'Washing Machine', 1, 'single', '🧺', TRUE, TRUE, 3, 'high_end', 'Automatic Washing Machine'),
+(4, 'Home Theatre', 1, 'single', '🎭', TRUE, TRUE, 4, 'high_end', 'Home Theatre System'),
 
--- Rare Prizes (category_id: 2)
-(7, 'Dinner Set', 2, 'single', '🍽️', TRUE, TRUE, 7, 'Complete Dinner Set'),
-(8, 'Jio Tab', 2, 'single', '📱', TRUE, TRUE, 8, 'Jio Tablet Device'),
-(9, 'Intex Home Theatre', 2, 'single', '🎭', TRUE, TRUE, 9, 'Intex Home Theatre System'),
-(10, 'Zebronics Home Theatre', 2, 'single', '🎪', TRUE, TRUE, 10, 'Zebronics Home Theatre System'),
-(11, 'Mi Smart Speaker', 2, 'single', '🔈', TRUE, TRUE, 11, 'Mi Smart Speaker'),
-(12, 'Gas Stove', 2, 'single', '🔥', TRUE, TRUE, 12, 'Multi-burner Gas Stove'),
-(13, 'Mixer Grinder', 2, 'single', '🥤', TRUE, TRUE, 13, 'High Speed Mixer Grinder'),
-(14, 'Low Cost Mobile', 2, 'single', '📞', TRUE, TRUE, 14, 'Budget Smartphone'),
+-- Mid-Budget Prizes (category_id: 2 / rare, budget_tier: mid_budget)
+(5, 'Luggage Bag', 2, 'single', '🧳', TRUE, TRUE, 5, 'mid_budget', 'Travel Luggage Bag'),
+(6, 'Govo Buds', 2, 'single', '🎧', TRUE, TRUE, 6, 'mid_budget', 'Govo Wireless Earbuds'),
+(7, 'Smart Audio Sunglasses', 2, 'single', '🕶️', TRUE, TRUE, 7, 'mid_budget', 'Smart Audio Sunglasses'),
+(8, 'Boult Q5 Bluetooth Speaker', 2, 'single', '🔊', TRUE, TRUE, 8, 'mid_budget', 'Boult Q5 Bluetooth Speaker'),
+(9, 'G5 Game + SUP Gaming Handheld', 2, 'single', '🎮', TRUE, TRUE, 9, 'mid_budget', 'G5 Game and SUP Gaming Handheld'),
+(10, 'Soundbar', 2, 'single', '📻', TRUE, TRUE, 10, 'mid_budget', 'Soundbar'),
 
--- Common Prizes (category_id: 3)
-(15, 'Smartwatch + Mini Cooler', 3, 'combo', '⌚', TRUE, TRUE, 15, 'Smartwatch and Mini Cooler Combo'),
-(16, 'Defy Buds + Google Speaker', 3, 'combo', '🎧', TRUE, TRUE, 16, 'Wireless Earbuds and Smart Speaker'),
-(17, 'Power Bank + Neckband', 3, 'combo', '🔋', TRUE, TRUE, 17, 'Power Bank and Wireless Neckband'),
-(18, 'Zebronics Astra BT Speaker', 3, 'single', '📻', TRUE, TRUE, 18, 'Bluetooth Speaker'),
-(19, 'Luggage Bags', 3, 'single', '🧳', TRUE, TRUE, 19, 'Travel Luggage Set'),
-(20, 'Pressure Cooker', 3, 'single', '🍲', TRUE, TRUE, 20, 'Stainless Steel Pressure Cooker'),
-(21, 'Free Pouch and Screen Guard', 3, 'combo', '📱', TRUE, TRUE, 21, 'Mobile Accessories Combo'),
-(22, 'Trimmer + Skullcandy Earphones', 3, 'combo', '✂️', TRUE, TRUE, 22, 'Grooming and Audio Combo')
+-- Budget Prizes (category_id: 3 / common, budget_tier: budget)
+(11, 'Screen Guard + Back Cover', 3, 'single', '📱', TRUE, TRUE, 11, 'budget', 'Mobile Screen Guard and Back Cover'),
+(12, 'Wired Earphones', 3, 'single', '🎧', TRUE, TRUE, 12, 'budget', 'Wired Earphones'),
+(13, 'Neckband', 3, 'single', '🎶', TRUE, TRUE, 13, 'budget', 'Wireless Neckband'),
+(14, 'Power Bank', 3, 'single', '🔋', TRUE, TRUE, 14, 'budget', 'Power Bank'),
+(15, 'Smart Watch', 3, 'single', '⌚', TRUE, TRUE, 15, 'budget', 'Smart Watch'),
+(16, 'Dinner Set', 3, 'single', '🍽️', TRUE, TRUE, 16, 'budget', 'Complete Dinner Set'),
+(17, 'Casserole Set', 3, 'single', '🍲', TRUE, TRUE, 17, 'budget', 'Casserole Set'),
+(18, 'Meetha Set', 3, 'single', '🍬', TRUE, TRUE, 18, 'budget', 'Meetha Set'),
+(19, 'Laptop Stand', 3, 'single', '💻', TRUE, TRUE, 19, 'budget', 'Laptop Stand'),
+(20, 'Massage Gun', 3, 'single', '💆', TRUE, TRUE, 20, 'budget', 'Massage Gun'),
+(21, 'Induction Stove', 3, 'single', '🔥', TRUE, TRUE, 21, 'budget', 'Induction Stove'),
+(22, '2-in-1 Juicer', 3, 'single', '🥤', TRUE, TRUE, 22, 'budget', '2-in-1 Juicer')
 ON CONFLICT (id) DO NOTHING;
 
 -- Reset sequence

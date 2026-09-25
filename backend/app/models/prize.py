@@ -42,7 +42,7 @@ class Prize:
             SELECT p.id, p.name, p.category_id, pc.name as category_name,
                    pc.display_name as category_display, p.type, p.emoji,
                    p.description, p.is_active, p.is_enabled, p.display_order,
-                   pc.color, pc.text_color
+                   p.budget_tier, pc.color, pc.text_color
             FROM prizes p
             JOIN prize_categories pc ON p.category_id = pc.id
         """
@@ -59,7 +59,7 @@ class Prize:
             SELECT p.id, p.name, p.category_id, pc.name as category_name,
                    pc.display_name as category_display, p.type, p.emoji,
                    p.description, p.is_active, p.is_enabled, p.display_order,
-                   pc.color, pc.text_color
+                   p.budget_tier, pc.color, pc.text_color
             FROM prizes p
             JOIN prize_categories pc ON p.category_id = pc.id
             WHERE p.id = :id
@@ -86,19 +86,20 @@ class Prize:
         return results or []
     
     @staticmethod
-    def create(name, category_id, emoji='🎁', description=None, display_order=0):
+    def create(name, category_id, emoji='🎁', description=None, display_order=0, budget_tier='budget'):
         """Create a new prize"""
         sql = """
-            INSERT INTO prizes (name, category_id, emoji, description, display_order, is_active, is_enabled)
-            VALUES (:name, :category_id, :emoji, :description, :display_order, TRUE, TRUE)
-            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order
+            INSERT INTO prizes (name, category_id, emoji, description, display_order, budget_tier, is_active, is_enabled)
+            VALUES (:name, :category_id, :emoji, :description, :display_order, :budget_tier, TRUE, TRUE)
+            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier
         """
         results = execute_sql(sql, {
             'name': name,
             'category_id': category_id,
             'emoji': emoji,
             'description': description,
-            'display_order': display_order
+            'display_order': display_order,
+            'budget_tier': budget_tier
         })
         
         if results:
@@ -119,7 +120,7 @@ class Prize:
     @staticmethod
     def update(prize_id, **kwargs):
         """Update a prize"""
-        allowed_fields = ['name', 'category_id', 'emoji', 'description', 'display_order', 'is_enabled']
+        allowed_fields = ['name', 'category_id', 'emoji', 'description', 'display_order', 'is_enabled', 'budget_tier']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
         
         if not updates:
@@ -131,7 +132,7 @@ class Prize:
         sql = f"""
             UPDATE prizes SET {set_clause}, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
-            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order
+            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier
         """
         
         results = execute_sql(sql, updates)

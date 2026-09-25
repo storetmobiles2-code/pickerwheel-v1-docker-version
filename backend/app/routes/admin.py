@@ -77,15 +77,22 @@ def add_prize():
         display_order = data.get('display_order', 0)
         initial_quantity = data.get('initial_quantity', 10)
         daily_limit = data.get('daily_limit', 5)
-        
+        budget_tier = data.get('budget_tier', 'budget')
+
         if not name or not category_id:
             return jsonify({
                 'success': False,
                 'error': 'Name and category_id are required'
             }), 400
-        
+
+        if budget_tier not in ('budget', 'mid_budget', 'high_end'):
+            return jsonify({
+                'success': False,
+                'error': "budget_tier must be one of 'budget', 'mid_budget', 'high_end'"
+            }), 400
+
         # Create prize
-        prize = Prize.create(name, category_id, emoji, description, display_order)
+        prize = Prize.create(name, category_id, emoji, description, display_order, budget_tier)
         
         if not prize:
             return jsonify({
@@ -198,7 +205,13 @@ def update_prize(prize_id):
         
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
-        
+
+        if 'budget_tier' in update_data and update_data['budget_tier'] not in ('budget', 'mid_budget', 'high_end'):
+            return jsonify({
+                'success': False,
+                'error': "budget_tier must be one of 'budget', 'mid_budget', 'high_end'"
+            }), 400
+
         result = Prize.update(prize_id, **update_data)
         
         if not result:
