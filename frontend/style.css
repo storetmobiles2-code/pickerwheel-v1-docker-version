@@ -627,36 +627,29 @@ body.spinning {
     to { opacity: 1; }
 }
 
-/* Traveling light on the circumference of the wheel slices - toggled via
-   #rimLightToggle. A single comet-like arc sweeps 360deg continuously,
+/* Traveling spotlight over the wheel slices - toggled via #rimLightToggle.
+   A ~95deg wedge (full radius, center to rim - the actual shape/extent of
+   the slices, not just a thin ring at the edge) sweeps 360deg continuously,
    independent of #wheelInner's spin rotation (this element is a sibling
    of #wheelInner, not a child of it, so it never spins with the prizes).
-   inset:0 puts it on the same boundary as the slices themselves, not out
-   in the decorative --ring border where .wheel::before's dots sit. */
+   mix-blend-mode:screen brightens whatever slices currently fall under it
+   rather than painting a flat color over them, so icons/labels stay
+   legible while the slices they're on visibly light up in turn. */
 .wheel-rim-light {
     position: absolute;
     inset: 0;
     z-index: 3;
     border-radius: 50%;
     pointer-events: none;
+    mix-blend-mode: screen;
     background: conic-gradient(from 0deg,
-        transparent 0deg 300deg,
-        var(--primary-light) 335deg,
-        #FFFFFF 349deg,
-        var(--primary-light) 356deg,
+        transparent 0deg 265deg,
+        var(--primary-light) 315deg,
+        #FFFFFF 337deg,
+        var(--primary-light) 358deg,
         transparent 360deg);
-    -webkit-mask: radial-gradient(circle,
-        transparent calc(50% - var(--ring) * 1.6),
-        #000 calc(50% - var(--ring) * 0.9),
-        #000 calc(50% - var(--ring) * 0.1),
-        transparent 50%);
-    mask: radial-gradient(circle,
-        transparent calc(50% - var(--ring) * 1.6),
-        #000 calc(50% - var(--ring) * 0.9),
-        #000 calc(50% - var(--ring) * 0.1),
-        transparent 50%);
-    filter: drop-shadow(0 0 4px var(--primary-light)) drop-shadow(0 0 10px var(--primary-light));
-    animation: rimLightTravel 3.6s linear infinite;
+    filter: drop-shadow(0 0 10px var(--primary-light));
+    animation: rimLightTravel 4.5s linear infinite;
     transition: opacity 0.35s ease;
 }
 
