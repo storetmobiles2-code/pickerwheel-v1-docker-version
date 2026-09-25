@@ -627,40 +627,76 @@ body.spinning {
     to { opacity: 1; }
 }
 
-/* Traveling spotlight over the wheel slices - toggled via #rimLightToggle.
-   A ~95deg wedge (full radius, center to rim - the actual shape/extent of
-   the slices, not just a thin ring at the edge) sweeps 360deg continuously,
-   independent of #wheelInner's spin rotation (this element is a sibling
-   of #wheelInner, not a child of it, so it never spins with the prizes).
-   mix-blend-mode:screen brightens whatever slices currently fall under it
-   rather than painting a flat color over them, so icons/labels stay
-   legible while the slices they're on visibly light up in turn. */
+/* LED chase-light around the wheel rim - toggled via #rimLightToggle.
+   One .rim-led per slice (built in wheel.js's renderRimLightBulbs(), since
+   it needs to line up with however many prizes are on the wheel right
+   now), each sitting on that slice's outer arc. A staggered
+   animation-delay per LED makes them pulse bright one after another
+   going clockwise, like a switching neon/marquee light completing a full
+   360deg loop - not a single element sliding smoothly around.
+   #wheelRimLight is a sibling of #wheelInner (not a child), so the whole
+   chase stays independent of the wheel's own spin rotation. */
 .wheel-rim-light {
     position: absolute;
     inset: 0;
     z-index: 3;
-    border-radius: 50%;
     pointer-events: none;
-    mix-blend-mode: screen;
-    background: conic-gradient(from 0deg,
-        transparent 0deg 265deg,
-        var(--primary-light) 315deg,
-        #FFFFFF 337deg,
-        var(--primary-light) 358deg,
-        transparent 360deg);
-    filter: drop-shadow(0 0 10px var(--primary-light));
-    animation: rimLightTravel 4.5s linear infinite;
+}
+
+.rim-led {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: rotate(var(--led-angle)) translateY(calc(var(--wheel-size) / -2 * 0.95));
+}
+
+.rim-led-dot {
+    position: absolute;
+    width: calc(var(--ring) * 1.3);
+    height: calc(var(--ring) * 1.3);
+    margin-left: calc(var(--ring) * -0.65);
+    margin-top: calc(var(--ring) * -0.65);
+    border-radius: 50%;
+    background: var(--primary-light);
+    opacity: 0.18;
+    filter: drop-shadow(0 0 2px var(--primary-light));
+    animation-name: ledPulse;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
     transition: opacity 0.35s ease;
 }
 
-.wheel-rim-light.paused {
+.wheel-rim-light.paused .rim-led-dot {
+    /* animation:none (not just paused) so this opacity actually wins -
+       a paused CSS animation keeps applying its last animated value,
+       which would otherwise still override a plain opacity here */
+    animation: none;
     opacity: 0;
-    animation-play-state: paused;
 }
 
-@keyframes rimLightTravel {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+@keyframes ledPulse {
+    0%, 78%, 100% {
+        opacity: 0.16;
+        background: var(--primary-light);
+        filter: drop-shadow(0 0 2px var(--primary-light));
+        transform: scale(0.75);
+    }
+    10% {
+        opacity: 1;
+        background: #FFFFFF;
+        filter:
+            drop-shadow(0 0 6px #FFFFFF)
+            drop-shadow(0 0 16px var(--primary-light))
+            drop-shadow(0 0 30px var(--primary-light));
+        transform: scale(1.6);
+    }
+    24% {
+        opacity: 0.3;
+        background: var(--primary-light);
+        transform: scale(0.9);
+    }
 }
 
 /* Gloss highlight + inner shadow over the slices */
@@ -1718,7 +1754,7 @@ body.spinning {
     .main-title,
     .wheel-container::before,
     .wheel::before,
-    .wheel-rim-light {
+    .rim-led-dot {
         animation: none;
     }
 }

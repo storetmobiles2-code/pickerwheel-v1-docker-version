@@ -685,7 +685,49 @@ class PickerWheelUI {
         // Create SVG wheel for precise segments
         this.createSVGWheel();
 
+        // Chase-light LEDs around the rim, one per slice (independent of
+        // #wheelInner so they never spin during a real spin)
+        this.renderRimLightBulbs();
+
         console.log('✅ Wheel created with', this.segments.length, 'equal segments');
+    }
+
+    /**
+     * Builds one small glowing "LED" per slice, sitting on the outer arc
+     * at that slice's angular center. Each gets a staggered animation-delay
+     * (index/count of the shared cycle duration) so they light up in turn
+     * going clockwise (segment.index already increases clockwise - see
+     * createSVGSegment), sweeping a full 360deg loop like chase lights.
+     * Positioned with rotate()+translateY() driven by the same
+     * var(--wheel-size)/--ring tokens the rest of the wheel uses, so it
+     * stays aligned across the responsive breakpoints with no resize
+     * handling needed.
+     */
+    renderRimLightBulbs() {
+        if (!this.wheelRimLight) return;
+
+        this.wheelRimLight.innerHTML = '';
+
+        const count = this.segments.length;
+        if (!count) return;
+
+        const cycleDuration = 4.8; // seconds for one full clockwise loop
+        this.segments.forEach(segment => {
+            const midAngle = (segment.startAngle + segment.endAngle) / 2;
+            const delay = (segment.index / count) * cycleDuration;
+
+            const led = document.createElement('div');
+            led.className = 'rim-led';
+            led.style.setProperty('--led-angle', `${midAngle}deg`);
+
+            const dot = document.createElement('div');
+            dot.className = 'rim-led-dot';
+            dot.style.animationDuration = `${cycleDuration}s`;
+            dot.style.animationDelay = `${delay}s`;
+
+            led.appendChild(dot);
+            this.wheelRimLight.appendChild(led);
+        });
     }
 
     createSVGWheel() {
