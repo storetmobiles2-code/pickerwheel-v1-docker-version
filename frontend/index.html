@@ -31,7 +31,7 @@
     <!-- Icon font subset to just the icons used on this page (a few KB).
          Adding a prize icon in wheel.js's PRIZE_ICON_MAP? Add it here too,
          keeping the list alphabetical. -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300..400,0..1,0&icon_names=ads_click,arrow_forward,auto_awesome,autorenew,battery_charging_full,blender,cake,cooking,dinner_dining,earbuds,eyeglasses,headphones,headset_mic,laptop,local_laundry_service,luggage,mode_fan,palette,redeem,refresh,settings,smartphone,soundbar,soup_kitchen,spa,spatial_audio,speaker,sports_esports,theaters,tv,visibility_off,volume_off,volume_up,watch&display=block" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300..400,0..1,0&icon_names=ads_click,arrow_forward,auto_awesome,autorenew,battery_charging_full,blender,cake,cooking,dinner_dining,earbuds,eyeglasses,flare,headphones,headset_mic,laptop,local_laundry_service,luggage,mode_fan,palette,redeem,refresh,settings,smartphone,soundbar,soup_kitchen,spa,spatial_audio,speaker,sports_esports,theaters,tv,visibility_off,volume_off,volume_up,watch&display=block" rel="stylesheet">
 
     <!-- Meta tags -->
     <meta name="description" content="myT MOBILES Spin & Win - Win amazing prizes with every spin!">
@@ -84,6 +84,9 @@
                     <button class="control-btn" id="effectsToggle" title="Toggle Effects">
                         <span class="control-icon material-symbol">auto_awesome</span>
                     </button>
+                    <button class="control-btn" id="rimLightToggle" title="Toggle Rim Light">
+                        <span class="control-icon material-symbol">flare</span>
+                    </button>
                     <button class="control-btn" id="designModeToggle" title="Switch design (Neon / Material)" onclick="toggleDesignMode()">
                         <span class="control-icon material-symbol" id="designModeIcon">palette</span>
                     </button>
@@ -110,6 +113,7 @@
                         <div class="wheel-inner" id="wheelInner">
                             <!-- Segments will be generated dynamically -->
                         </div>
+                        <div class="wheel-rim-light" id="wheelRimLight" aria-hidden="true"></div>
                         <button class="wheel-center-button" id="spinButton">SPIN</button>
                     </div>
                 </div>

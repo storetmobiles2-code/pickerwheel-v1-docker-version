@@ -32,6 +32,7 @@ class PickerWheelUI {
         // Settings
         this.soundEnabled = true;
         this.effectsEnabled = true;
+        this.rimLightEnabled = true;
         
         // Daily prizes log state
         this.dailyPrizesLog = [];
@@ -106,7 +107,9 @@ class PickerWheelUI {
             this.modalOverlay = document.getElementById('modalOverlay');
             this.soundToggle = document.getElementById('soundToggle');
             this.effectsToggle = document.getElementById('effectsToggle');
-            
+            this.rimLightToggle = document.getElementById('rimLightToggle');
+            this.wheelRimLight = document.getElementById('wheelRimLight');
+
             if (!this.wheel || !this.wheelInner || !this.spinButton) {
                 throw new Error('Required DOM elements not found');
             }
@@ -164,6 +167,10 @@ class PickerWheelUI {
         
         if (this.effectsToggle) {
             this.effectsToggle.addEventListener('click', () => this.toggleEffects());
+        }
+
+        if (this.rimLightToggle) {
+            this.rimLightToggle.addEventListener('click', () => this.toggleRimLight());
         }
 
         // Keyboard shortcuts
@@ -484,17 +491,45 @@ class PickerWheelUI {
         console.log('✨ Effects', this.effectsEnabled ? 'enabled' : 'disabled');
     }
 
+    toggleRimLight() {
+        this.rimLightEnabled = !this.rimLightEnabled;
+
+        if (this.rimLightToggle) {
+            if (this.rimLightEnabled) {
+                this.rimLightToggle.classList.remove('disabled');
+                this.rimLightToggle.title = 'Disable Rim Light';
+            } else {
+                this.rimLightToggle.classList.add('disabled');
+                this.rimLightToggle.title = 'Enable Rim Light';
+            }
+        }
+
+        if (this.wheelRimLight) {
+            this.wheelRimLight.classList.toggle('paused', !this.rimLightEnabled);
+        }
+
+        // Save preference
+        localStorage.setItem('picker_wheel_rim_light', this.rimLightEnabled);
+        console.log('💡 Rim light', this.rimLightEnabled ? 'enabled' : 'disabled');
+    }
+
     loadSettings() {
         // Load sound preference
         const savedSound = localStorage.getItem('picker_wheel_sound');
         if (savedSound !== null) {
             this.soundEnabled = savedSound === 'true';
         }
-        
+
         // Load effects preference
         const savedEffects = localStorage.getItem('picker_wheel_effects');
         if (savedEffects !== null) {
             this.effectsEnabled = savedEffects === 'true';
+        }
+
+        // Load rim light preference
+        const savedRimLight = localStorage.getItem('picker_wheel_rim_light');
+        if (savedRimLight !== null) {
+            this.rimLightEnabled = savedRimLight === 'true';
         }
         
         // Update button states
@@ -517,8 +552,21 @@ class PickerWheelUI {
                 this.effectsToggle.title = 'Enable Effects';
             }
         }
-        
-        console.log('⚙️ Settings loaded - Sound:', this.soundEnabled, 'Effects:', this.effectsEnabled);
+
+        if (this.rimLightToggle) {
+            if (this.rimLightEnabled) {
+                this.rimLightToggle.classList.remove('disabled');
+                this.rimLightToggle.title = 'Disable Rim Light';
+            } else {
+                this.rimLightToggle.classList.add('disabled');
+                this.rimLightToggle.title = 'Enable Rim Light';
+            }
+        }
+        if (this.wheelRimLight) {
+            this.wheelRimLight.classList.toggle('paused', !this.rimLightEnabled);
+        }
+
+        console.log('⚙️ Settings loaded - Sound:', this.soundEnabled, 'Effects:', this.effectsEnabled, 'Rim light:', this.rimLightEnabled);
     }
 
     async loadAvailablePrizes() {

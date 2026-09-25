@@ -209,10 +209,8 @@ body.spinning {
 }
 
 .main-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    align-items: center;
-    gap: 32px;
+    display: flex;
+    justify-content: center;
 }
 
 .wheel-stage {
@@ -629,6 +627,49 @@ body.spinning {
     to { opacity: 1; }
 }
 
+/* Traveling light on the circumference of the wheel slices - toggled via
+   #rimLightToggle. A single comet-like arc sweeps 360deg continuously,
+   independent of #wheelInner's spin rotation (this element is a sibling
+   of #wheelInner, not a child of it, so it never spins with the prizes).
+   inset:0 puts it on the same boundary as the slices themselves, not out
+   in the decorative --ring border where .wheel::before's dots sit. */
+.wheel-rim-light {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(from 0deg,
+        transparent 0deg 300deg,
+        var(--primary-light) 335deg,
+        #FFFFFF 349deg,
+        var(--primary-light) 356deg,
+        transparent 360deg);
+    -webkit-mask: radial-gradient(circle,
+        transparent calc(50% - var(--ring) * 1.6),
+        #000 calc(50% - var(--ring) * 0.9),
+        #000 calc(50% - var(--ring) * 0.1),
+        transparent 50%);
+    mask: radial-gradient(circle,
+        transparent calc(50% - var(--ring) * 1.6),
+        #000 calc(50% - var(--ring) * 0.9),
+        #000 calc(50% - var(--ring) * 0.1),
+        transparent 50%);
+    filter: drop-shadow(0 0 4px var(--primary-light)) drop-shadow(0 0 10px var(--primary-light));
+    animation: rimLightTravel 3.6s linear infinite;
+    transition: opacity 0.35s ease;
+}
+
+.wheel-rim-light.paused {
+    opacity: 0;
+    animation-play-state: paused;
+}
+
+@keyframes rimLightTravel {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 /* Gloss highlight + inner shadow over the slices */
 .wheel::after {
     content: '';
@@ -837,11 +878,13 @@ body.spinning {
    ======================================================================== */
 
 .how-it-works {
-    align-self: start;
-    margin-top: calc(var(--stage-top) + var(--ring));
-    width: 100%;
-    padding: 22px 20px 20px;
-    border-radius: 22px;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 40;
+    width: 200px;
+    padding: 14px 14px 12px;
+    border-radius: 18px;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
@@ -855,28 +898,28 @@ body.spinning {
 }
 
 .how-it-works-title {
-    font-size: 1.05rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-primary);
-    margin-bottom: 16px;
+    margin-bottom: 10px;
 }
 
 .how-it-works-steps {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 
 .step-item {
     display: grid;
     grid-template-columns: auto auto 1fr;
     align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    border-radius: 14px;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -885,25 +928,25 @@ body.spinning {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #FF4FA3, #E50065 55%, #8A0038);
     color: #FFFFFF;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.68rem;
     box-shadow: 0 0 14px rgba(255, 43, 134, 0.55), inset 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
 .step-icon {
-    font-size: 30px;
+    font-size: 16px;
     color: var(--text-primary);
     font-variation-settings: 'FILL' 0, 'wght' 300;
 }
 
 .step-text {
-    font-size: 0.95rem;
-    line-height: 1.3;
+    font-size: 0.66rem;
+    line-height: 1.15;
     color: var(--text-secondary);
 }
 
@@ -1553,24 +1596,24 @@ body.spinning {
    Responsive
    ======================================================================== */
 
-/* Tablet: stack the How It Works card under the wheel */
-@media (max-width: 1100px) {
-    .main-content {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 24px;
-    }
-
-    .how-it-works {
-        justify-self: center;
-        max-width: 460px;
-        margin-top: 0;
-    }
-}
-
-/* Compact header */
+/* Compact header, and How It Works reverts from a floating corner card to
+   a normal stacked one - below this width the wheel alone nearly fills
+   the container, leaving no safe side margin for a floating card. */
 @media (max-width: 820px) {
     .container {
         padding: 16px 16px 4px;
+    }
+
+    .main-content {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .how-it-works {
+        position: static;
+        width: 100%;
+        max-width: 380px;
+        margin: 20px auto 0;
     }
 
     .top-nav {
@@ -1681,7 +1724,8 @@ body.spinning {
     .floating-element,
     .main-title,
     .wheel-container::before,
-    .wheel::before {
+    .wheel::before,
+    .wheel-rim-light {
         animation: none;
     }
 }
