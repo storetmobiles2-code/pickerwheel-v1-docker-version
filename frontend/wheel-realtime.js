@@ -30,7 +30,7 @@
 
     // Wait for PickerWheelUI to be available
     const checkInterval = setInterval(() => {
-        if (typeof PickerWheelUI !== 'undefined' && window.pickerWheel) {
+        if (typeof PickerWheelUI !== 'undefined' && window.pickerWheelUI) {
             clearInterval(checkInterval);
             checkFeatureFlagAndInit();
         }
@@ -67,7 +67,7 @@
      * Initialize real-time updates (WebSocket + fallback polling)
      */
     function initializeRealtime() {
-        const wheel = window.pickerWheel;
+        const wheel = window.pickerWheelUI;
         
         // Calculate initial prize hash for change detection
         lastPrizeHash = calculatePrizeHash(wheel.availablePrizes);
@@ -133,7 +133,9 @@
         // Listen for prize updates from admin
         socket.on('prizes:updated', async (data) => {
             console.log('📦 Received prizes:updated event');
-            handlePrizesUpdate(wheel, data.prizes);
+            if (wheel.updatePrizes(data.prizes)) {
+                updatePrizeCountDisplay(wheel.availablePrizes.length);
+            }
         });
 
         socket.on('prize:added', async (data) => {
@@ -207,7 +209,9 @@
                 // Only update if prizes have changed
                 if (newHash !== lastPrizeHash) {
                     console.log('🔄 Prize changes detected, updating wheel...');
-                    handlePrizesUpdate(wheel, data.prizes);
+                    if (wheel.updatePrizes(data.prizes)) {
+                        updatePrizeCountDisplay(wheel.availablePrizes.length);
+                    }
                     lastPrizeHash = newHash;
                 }
             }
@@ -225,104 +229,32 @@
     }
 
     /**
-     * Handle prize updates
-     */
-    function handlePrizesUpdate(wheel, prizes) {
-        if (!prizes || prizes.length === 0) {
-            console.warn('No prizes received');
-            return;
-        }
-
-        // Don't update while spinning
-        if (wheel.isSpinning) {
-            console.log('⏳ Wheel is spinning, queuing update...');
-            wheel._pendingPrizeUpdate = prizes;
-            return;
-        }
-
-        updateWheelPrizes(wheel, prizes);
-    }
-
-    /**
-     * Update wheel prizes and rebuild the wheel
-     */
-    function updateWheelPrizes(wheel, prizes) {
-        try {
-            // Get current rotation to preserve position
-            const currentRotation = wheel.currentRotation || 0;
-            
-            // Transform prizes to expected format
-            const formattedPrizes = prizes.map((prize) => ({
-                id: prize.prize_id || prize.id,
-                prize_id: prize.prize_id || prize.id,
-                name: prize.name || prize.prize_name,
-                category: prize.category_name || prize.category,
-                category_name: prize.category_name || prize.category,
-                emoji: prize.emoji || '🎁',
-                is_enabled: prize.is_enabled !== false,
-                remaining_quantity: prize.remaining_quantity || 0
-            }));
-
-            // Check what changed
-            const oldCount = wheel.availablePrizes?.length || 0;
-            const newCount = formattedPrizes.length;
-            
-            if (oldCount !== newCount) {
-                console.log(`🎡 Prize count changed: ${oldCount} → ${newCount}`);
-            }
-
-            // Update wheel's prize list
-            wheel.availablePrizes = formattedPrizes;
-
-            // Rebuild the wheel with animation
-            if (wheel.createWheel) {
-                console.log(`🎡 Rebuilding wheel with ${formattedPrizes.length} prizes`);
-                
-                // Add a subtle fade effect during rebuild
-                const wheelElement = document.getElementById('wheelInner');
-                if (wheelElement) {
-                    wheelElement.style.transition = 'opacity 0.3s';
-                    wheelElement.style.opacity = '0.7';
-                    
-                    setTimeout(() => {
-                        wheel.createWheel();
-                        wheelElement.style.opacity = '1';
-                    }, 150);
-                } else {
-                    wheel.createWheel();
-                }
-            }
-
-            // Update stats display
-            if (wheel.loadStats) {
-                wheel.loadStats();
-            }
-
-            // Update the prize count display
-            updatePrizeCountDisplay(formattedPrizes.length);
-
-            console.log('✅ Wheel updated successfully');
-
-        } catch (error) {
-            console.error('Error updating wheel prizes:', error);
-        }
-    }
-
-    /**
-     * Setup spin completion handler to apply pending updates
+     * Setup spin completion handler to apply pending updates.
+     *
+     * wheel.updatePrizes() (in wheel.js) already queues an update into
+     * wheel._pendingPrizeUpdate when a spin is in progress instead of
+     * rebuilding mid-animation - but nothing ever flushed that queue once
+     * the spin actually finished, so an update that arrived mid-spin was
+     * silently dropped forever. This hooks the real completion callback
+     * (showCelebration - this used to reference a showWinModal method that
+     * has never existed in wheel.js, so this handler never actually
+     * attached) and re-runs updatePrizes() with whatever came in while
+     * spinning.
      */
     function setupSpinCompletionHandler(wheel) {
-        const originalShowWinModal = wheel.showWinModal?.bind(wheel);
-        if (originalShowWinModal) {
-            wheel.showWinModal = function(prize) {
-                originalShowWinModal(prize);
-                
+        const originalShowCelebration = wheel.showCelebration?.bind(wheel);
+        if (originalShowCelebration) {
+            wheel.showCelebration = function(prize) {
+                originalShowCelebration(prize);
+
                 // Check for pending prize update after spin
                 setTimeout(() => {
                     if (wheel._pendingPrizeUpdate) {
                         console.log('📦 Applying pending prize update...');
-                        updateWheelPrizes(wheel, wheel._pendingPrizeUpdate);
+                        const pending = wheel._pendingPrizeUpdate;
                         wheel._pendingPrizeUpdate = null;
+                        wheel.updatePrizes(pending);
+                        updatePrizeCountDisplay(wheel.availablePrizes?.length || 0);
                     }
                 }, 1000);
             };
@@ -458,8 +390,8 @@
         getConnectionStatus: () => connectionStatus,
         isEnabled: () => realtimeEnabled,
         refresh: () => {
-            if (window.pickerWheel) {
-                refreshPrizesFromServer(window.pickerWheel);
+            if (window.pickerWheelUI) {
+                refreshPrizesFromServer(window.pickerWheelUI);
             }
         }
     };
