@@ -3,6 +3,7 @@ PickerWheel Database Module
 PostgreSQL connection pool and session management
 """
 
+import json
 import logging
 from contextlib import contextmanager
 from sqlalchemy import create_engine, text
@@ -107,6 +108,32 @@ def run_in_transaction(fn):
     """
     with session_scope() as session:
         return fn(session)
+
+
+def log_audit(action, entity_type, entity_id=None, performed_by=None,
+              old_value=None, new_value=None):
+    """
+    Write one row to audit_log.
+
+    performed_by should be the human-readable actor name captured once
+    per admin session (see admin.py's _actor() helper) - now that the
+    admin panel is used from multiple devices/people at once, hardcoding
+    'admin' everywhere means an incident can never be traced back to who
+    (or which device) actually made a change. Falls back to 'unknown'
+    rather than a fixed literal, so a genuinely missing actor is visible
+    as such instead of looking like a real, attributed action.
+    """
+    execute_sql("""
+        INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, performed_by)
+        VALUES (:action, :entity_type, :entity_id, :old_value, :new_value, :performed_by)
+    """, {
+        'action': action,
+        'entity_type': entity_type,
+        'entity_id': entity_id,
+        'old_value': json.dumps(old_value, default=str) if old_value is not None else None,
+        'new_value': json.dumps(new_value, default=str) if new_value is not None else None,
+        'performed_by': performed_by or 'unknown',
+    })
 
 
 def execute_function(func_name, *args):

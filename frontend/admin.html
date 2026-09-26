@@ -777,6 +777,14 @@
 
         <!-- Admin Content -->
         <div class="admin-content" id="adminContent">
+            <!-- Shown when another device changes something while this one is
+                 open. Does not auto-refresh - an admin mid-edit shouldn't have
+                 their in-progress form silently reloaded out from under them. -->
+            <div id="liveUpdateBanner" style="display: none; align-items: center; justify-content: space-between; gap: 1rem; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning, #ffc107); color: var(--warning-text, #7a5b00); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                <span>⚡ <span id="liveUpdateMessage">Data changed on another device</span></span>
+                <button class="btn btn-sm" style="white-space: nowrap;" onclick="refreshCurrentTab()">Refresh Now</button>
+            </div>
+
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('prizes')">🎁 Prizes</button>
@@ -857,6 +865,7 @@
                             <select id="templateSelector" onchange="loadTemplateDetails()" style="min-width: 180px;">
                                 <option value="">Select a template...</option>
                             </select>
+                            <button class="btn btn-ghost btn-sm" onclick="loadTemplates(); if (currentTemplateId) loadTemplateDetails();">🔄 Refresh</button>
                             <button class="btn btn-ghost btn-sm" onclick="editDefaultTemplate()" title="Quick edit the default template">
                                 ⚙️ Edit Default
                             </button>
@@ -911,7 +920,10 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">🎯 Guaranteed Wins Queue</h3>
-                        <button class="btn btn-primary btn-sm" onclick="showScheduleWinModal()">➕ Schedule Win</button>
+                        <div class="actions-row">
+                            <button class="btn btn-ghost btn-sm" onclick="loadGuaranteedWins()">🔄 Refresh</button>
+                            <button class="btn btn-primary btn-sm" onclick="showScheduleWinModal()">➕ Schedule Win</button>
+                        </div>
                     </div>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.875rem;">
                         Schedule specific prizes to be won at specific times or trigger them on the next spin.
@@ -988,7 +1000,10 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">🎉 Special Events</h3>
-                        <button class="btn btn-primary btn-sm" onclick="showAddEventModal()">➕ Create Event</button>
+                        <div class="actions-row">
+                            <button class="btn btn-ghost btn-sm" onclick="loadEvents()">🔄 Refresh</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAddEventModal()">➕ Create Event</button>
+                        </div>
             </div>
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.875rem;">
                         Schedule special promotional events for festivals like Republic Day, Diwali, etc. 
@@ -1005,8 +1020,11 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">📊 Detailed Statistics</h3>
-                        <div class="form-group" style="margin: 0;">
-                            <input type="date" id="statsDate" onchange="loadDetailedStats()">
+                        <div class="actions-row">
+                            <div class="form-group" style="margin: 0;">
+                                <input type="date" id="statsDate" onchange="loadDetailedStats()">
+                            </div>
+                            <button class="btn btn-ghost btn-sm" onclick="loadDetailedStats()">🔄 Refresh</button>
                         </div>
                     </div>
                     <div id="detailedStatsContainer">
@@ -1478,11 +1496,33 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Same Socket.IO client version index.html uses -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <script>
         const API_BASE = '/api';
         let authPassword = null;
+        let adminActor = null;
         let prizesData = [];
         let categoriesData = [];
+
+        // Who's making changes from this browser, for the audit log (see
+        // backend's log_audit()/_actor()). Everyone shares one admin
+        // password, so without this every action in audit_log would say
+        // "unknown" and an incident could never be traced back to who (or
+        // which device) actually made a change. Asked once per browser tab
+        // (sessionStorage), not stored in localStorage, since a shared/
+        // public device shouldn't remember a name across full browser
+        // restarts.
+        function getOrPromptActorName() {
+            let name = sessionStorage.getItem('admin_actor_name');
+            if (!name) {
+                name = (window.prompt('Your name (for the change log):') || '').trim();
+                if (name) sessionStorage.setItem('admin_actor_name', name);
+            }
+            adminActor = name || 'unknown';
+            return adminActor;
+        }
 
         // Escapes admin-entered text (prize/event/template names,
         // descriptions, reasons) before it's interpolated into innerHTML.
@@ -1531,14 +1571,17 @@
         }
 
         // Tab switching
+        let currentTab = 'prizes'; // tracked so refreshCurrentTab() knows what to reload
+
         function switchTab(tab) {
+            currentTab = tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            
+
             const tabIndex = { prizes: 1, schedule: 2, events: 3, stats: 4 }[tab] || 1;
             document.querySelector(`.tab:nth-child(${tabIndex})`).classList.add('active');
             document.getElementById(tab + 'Panel').classList.add('active');
-            
+
             if (tab === 'schedule') {
                 loadTemplates(true); // Auto-select default template on first load
                 loadGuaranteedWins();
@@ -1551,6 +1594,29 @@
                 document.getElementById('statsDate').value = toLocalDateString(new Date());
                 loadDetailedStats();
             }
+        }
+
+        // Reloads whatever the admin is currently looking at, in response
+        // to a live "something changed elsewhere" notification. Deliberately
+        // not automatic - see the comment on #liveUpdateBanner.
+        function refreshCurrentTab() {
+            document.getElementById('liveUpdateBanner').style.display = 'none';
+            loadPrizes(); // the stats-grid counts at the top are always visible
+            if (currentTab === 'schedule') {
+                loadTemplates();
+                if (currentTemplateId) loadTemplateDetails();
+                loadGuaranteedWins();
+                loadDateAssignments();
+            } else if (currentTab === 'events') {
+                loadEvents();
+            } else if (currentTab === 'stats') {
+                loadDetailedStats();
+            }
+        }
+
+        function showLiveUpdateBanner(message) {
+            document.getElementById('liveUpdateMessage').textContent = message;
+            document.getElementById('liveUpdateBanner').style.display = 'flex';
         }
 
         // Authentication
@@ -1566,12 +1632,14 @@
 
                 if (response.ok) {
                     authPassword = password;
+                    getOrPromptActorName();
                     document.getElementById('loginSection').style.display = 'none';
                     document.getElementById('adminContent').classList.add('show');
                     document.getElementById('headerActions').style.display = 'block';
                     loadCategories();
                     loadPrizes();
                     loadStats();
+                    connectLiveUpdates();
                 } else {
                     document.getElementById('loginError').textContent = 'Invalid password';
                 }
@@ -1586,6 +1654,48 @@
             document.getElementById('adminContent').classList.remove('show');
             document.getElementById('headerActions').style.display = 'none';
             document.getElementById('adminPassword').value = '';
+            disconnectLiveUpdates();
+        }
+
+        // Live updates: lets an admin panel open on one device know when
+        // another device changed something, instead of silently going
+        // stale until the page happens to be reloaded. Connects only
+        // after a successful login, since admin:join requires the
+        // password (see websocket.py's admin auth).
+        let liveSocket = null;
+
+        function connectLiveUpdates() {
+            if (typeof io === 'undefined' || liveSocket) return;
+            liveSocket = io({ transports: ['websocket', 'polling'] });
+
+            liveSocket.on('connect', () => {
+                liveSocket.emit('admin:join', { admin_password: authPassword });
+            });
+
+            const onPrizesChanged = () => showLiveUpdateBanner('Prize or inventory data changed on another device');
+            liveSocket.on('prizes:updated', onPrizesChanged);
+            liveSocket.on('prize:added', onPrizesChanged);
+            liveSocket.on('prize:removed', onPrizesChanged);
+            liveSocket.on('prize:enabled_changed', onPrizesChanged);
+            liveSocket.on('prize:inventory_updated', onPrizesChanged);
+            liveSocket.on('transaction:new', () => {
+                // A customer just won something - only worth a banner if
+                // stats or the log-like views are what's on screen
+                if (currentTab === 'stats' || currentTab === 'prizes') {
+                    showLiveUpdateBanner('A new spin happened - stats may be out of date');
+                }
+            });
+            liveSocket.on('admin:notification', (data) => {
+                showLiveUpdateBanner(data?.message || 'Something changed on another device');
+            });
+        }
+
+        function disconnectLiveUpdates() {
+            if (liveSocket) {
+                liveSocket.disconnect();
+                liveSocket = null;
+            }
+            document.getElementById('liveUpdateBanner').style.display = 'none';
         }
 
         // API Helpers
@@ -1603,7 +1713,7 @@
                     'Content-Type': 'application/json',
                     'X-Admin-Password': authPassword
                 },
-                body: JSON.stringify({ ...data, admin_password: authPassword })
+                body: JSON.stringify({ ...data, admin_password: authPassword, admin_actor: adminActor })
             });
             return response.json();
         }
@@ -1615,9 +1725,31 @@
                     'Content-Type': 'application/json',
                     'X-Admin-Password': authPassword
                 },
-                body: JSON.stringify({ ...data, admin_password: authPassword })
+                body: JSON.stringify({ ...data, admin_password: authPassword, admin_actor: adminActor })
             });
             return response.json();
+        }
+
+        // Same as apiPost/apiPut but also surfaces the HTTP status, so a
+        // caller can tell a 409 (someone else changed this first) apart
+        // from an ordinary validation failure and react differently -
+        // reload instead of just showing an error toast.
+        async function apiPostWithStatus(endpoint, data = {}) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Password': authPassword },
+                body: JSON.stringify({ ...data, admin_password: authPassword, admin_actor: adminActor })
+            });
+            return { data: await response.json(), status: response.status };
+        }
+
+        async function apiPutWithStatus(endpoint, data = {}) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Password': authPassword },
+                body: JSON.stringify({ ...data, admin_password: authPassword, admin_actor: adminActor })
+            });
+            return { data: await response.json(), status: response.status };
         }
 
         async function apiDelete(endpoint) {
@@ -1627,7 +1759,7 @@
                     'Content-Type': 'application/json',
                     'X-Admin-Password': authPassword
                 },
-                body: JSON.stringify({ admin_password: authPassword })
+                body: JSON.stringify({ admin_password: authPassword, admin_actor: adminActor })
             });
             return response.json();
         }
@@ -1662,7 +1794,14 @@
                         remaining_quantity: item.remaining_quantity,
                         initial_quantity: item.initial_quantity,
                         daily_limit: item.daily_limit,
-                        wins_today: item.wins_today || 0
+                        wins_today: item.wins_today || 0,
+                        // Optimistic-concurrency tokens: sent back on the
+                        // next edit so the server can tell whether someone
+                        // else changed this row first (see PUT /prizes/:id
+                        // and POST /inventory/:id/set, both of which now
+                        // require expected_updated_at).
+                        updated_at: item.updated_at,
+                        prize_updated_at: item.prize_updated_at
                     }));
                     renderPrizesTable(prizesData);
                     updateStats(data);
@@ -1778,17 +1917,33 @@
             }
         }
 
+        // Shown when a save is rejected because someone else changed the
+        // same record first (409) - the admin panel can now be open on
+        // several devices at once, so this is a real, expected case, not
+        // just theoretical. Discards this device's in-progress edit and
+        // reloads rather than attempting a merge.
+        function handleConflict(data, status, reload = loadPrizes) {
+            if (status === 409) {
+                showToast(data.error || 'This was changed on another device - reloaded with the latest', 'error');
+                reload();
+                return true;
+            }
+            return false;
+        }
+
         async function adjustQuantity(prizeId, adjustment) {
             try {
                 const prize = prizesData.find(p => p.id === prizeId);
                 const currentQty = prize?.remaining_quantity || 0;
                 const newQty = Math.max(0, currentQty + adjustment);
-                
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { quantity: newQty });
+
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    quantity: newQty, expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast(`Quantity ${adjustment > 0 ? 'increased' : 'decreased'}`, 'success');
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to adjust quantity', 'error');
                 }
             } catch (error) {
@@ -1798,11 +1953,14 @@
 
         async function setQuantity(prizeId, quantity) {
             try {
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { quantity: parseInt(quantity) });
+                const prize = prizesData.find(p => p.id === prizeId);
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    quantity: parseInt(quantity), expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast('Quantity updated', 'success');
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to set quantity', 'error');
                 }
             } catch (error) {
@@ -1845,7 +2003,10 @@
             }
             
             try {
-                const data = await apiPut(`/admin/prizes/${editingPrizeId}`, { name: newName });
+                const prize = prizesData.find(p => p.id === editingPrizeId);
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${editingPrizeId}`, {
+                    name: newName, expected_updated_at: prize?.prize_updated_at
+                });
                 if (data.success) {
                     showToast('Prize name updated', 'success');
                     closeModal('editPrizeNameModal');
@@ -1854,28 +2015,32 @@
                     if (currentTemplateId) {
                         loadTemplateDetails();
                     }
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update name', 'error');
                 }
             } catch (error) {
                 showToast('Error updating name', 'error');
             }
         }
-        
+
         // Update Daily Limit (updates the default template's daily limit for this prize)
         async function updateDailyLimit(prizeId, limit) {
             const dailyLimit = parseInt(limit, 10);
-            if (Number.isNaN(dailyLimit) || dailyLimit < 1) {
-                showToast('Daily limit must be a whole number of at least 1', 'error');
+            if (Number.isNaN(dailyLimit) || dailyLimit < 0) {
+                showToast('Daily limit must be a whole number of at least 0', 'error');
                 loadPrizes(); // Restore the saved value
                 return;
             }
             try {
+                const prize = prizesData.find(p => p.id === prizeId);
                 // Saves today's limit (what spins enforce) and syncs the default template
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { daily_limit: dailyLimit });
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    daily_limit: dailyLimit, expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast('Daily limit updated', 'success');
-                } else {
+                    loadPrizes();
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update daily limit', 'error');
                     loadPrizes(); // Refresh to show original value
                 }
@@ -1888,13 +2053,15 @@
         // Update Budget Tier (admin-panel price grouping only - no effect on rarity/win odds)
         async function updatePrizeTier(prizeId, tier) {
             try {
-                const data = await apiPut(`/admin/prizes/${prizeId}`, { budget_tier: tier });
+                const prize = prizesData.find(p => p.id === prizeId);
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${prizeId}`, {
+                    budget_tier: tier, expected_updated_at: prize?.prize_updated_at
+                });
                 if (data.success) {
-                    const prize = prizesData.find(p => p.id === prizeId);
                     if (prize) prize.budget_tier = tier;
                     showToast('Budget tier updated', 'success');
-                    renderPrizesTable();
-                } else {
+                    loadPrizes();
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update budget tier', 'error');
                     loadPrizes();
                 }
@@ -2414,6 +2581,7 @@
         // =====================================================
         
         let currentTemplateId = null;
+        let currentTemplateUpdatedAt = null; // for optimistic-concurrency checks on PUT /templates/:id
         let templatesData = [];
         
         async function loadTemplates(autoSelectDefault = false) {
@@ -2479,6 +2647,7 @@
                 const data = await apiGet(`/admin/templates/${templateId}`);
                 if (data.success && data.template) {
                     const template = data.template;
+                    currentTemplateUpdatedAt = template.updated_at;
                     document.getElementById('templateName').textContent = template.name;
                     document.getElementById('templateDescription').textContent = template.description || '';
                     const defaultBadge = document.getElementById('templateDefault');
@@ -2562,13 +2731,16 @@
         
         async function setTemplateAsDefault() {
             if (!currentTemplateId) return;
-            
+
             try {
-                const data = await apiPut(`/admin/templates/${currentTemplateId}`, { is_default: true });
+                const { data, status } = await apiPutWithStatus(`/admin/templates/${currentTemplateId}`, {
+                    is_default: true, expected_updated_at: currentTemplateUpdatedAt
+                });
                 if (data.success) {
                     showToast('Template set as default', 'success');
                     loadTemplates();
-                } else {
+                    loadTemplateDetails();
+                } else if (!handleConflict(data, status, loadTemplateDetails)) {
                     showToast(data.error || 'Failed to update template', 'error');
                 }
             } catch (error) {
@@ -2662,7 +2834,12 @@
             }
             
             try {
-                const data = await apiPut(`/admin/prizes/${prizeId}`, { name: newName });
+                // prizesData is loaded at login and is the only place this
+                // page currently tracks a prize's own updated_at
+                const cachedPrize = prizesData.find(p => p.id === parseInt(prizeId, 10));
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${prizeId}`, {
+                    name: newName, expected_updated_at: cachedPrize?.prize_updated_at
+                });
                 if (data.success) {
                     showToast('Prize name updated', 'success');
                     closeModal('editTemplatePrizeModal');
@@ -2671,9 +2848,9 @@
                     if (nameSpan) nameSpan.textContent = newName;
                     // Also refresh template details for consistency
                     loadTemplateDetails();
-                    // Refresh prizes tab data too
+                    // Refresh prizes tab data too (also picks up the new updated_at)
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update prize name', 'error');
                 }
             } catch (error) {

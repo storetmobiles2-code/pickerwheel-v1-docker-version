@@ -97,28 +97,38 @@ class DailyPrizeTemplate:
         return None
     
     @staticmethod
-    def update(template_id, **kwargs):
-        """Update a template"""
+    def update(template_id, expected_updated_at=None, **kwargs):
+        """
+        Update a template.
+
+        expected_updated_at: optimistic-concurrency check - when given,
+        the update only applies if the row's updated_at still matches.
+        """
         allowed_fields = ['name', 'description', 'is_default', 'is_active']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields and v is not None}
-        
+
         if not updates:
             return None
-        
+
         # Handle setting as default
         if updates.get('is_default'):
             execute_sql("UPDATE daily_prize_templates SET is_default = FALSE WHERE is_default = TRUE")
-        
+
         set_clauses = [f"{k} = :{k}" for k in updates.keys()]
         updates['template_id'] = template_id
-        
+
+        where_clause = "WHERE id = :template_id"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            updates['expected_updated_at'] = expected_updated_at
+
         sql = f"""
             UPDATE daily_prize_templates
             SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :template_id
-            RETURNING id, name, description, is_default, is_active
+            {where_clause}
+            RETURNING id, name, description, is_default, is_active, updated_at
         """
-        
+
         results = execute_sql(sql, updates)
         return results[0] if results else None
     
@@ -311,7 +321,7 @@ class GuaranteedWin:
         sql = """
             SELECT gw.id, gw.prize_id, gw.scheduled_at, gw.target_identifier,
                    gw.reason, gw.status, gw.priority, gw.triggered_at,
-                   gw.triggered_by_user, gw.created_by, gw.created_at,
+                   gw.triggered_by_user, gw.created_by, gw.created_at, gw.updated_at,
                    gw.max_triggers, gw.triggered_count, gw.expires_at,
                    p.name AS prize_name, p.emoji AS prize_emoji,
                    pc.name AS category_name
@@ -345,7 +355,7 @@ class GuaranteedWin:
         sql = """
             SELECT gw.id, gw.prize_id, gw.scheduled_at, gw.target_identifier,
                    gw.reason, gw.status, gw.priority, gw.triggered_at,
-                   gw.triggered_by_user, gw.created_by, gw.created_at,
+                   gw.triggered_by_user, gw.created_by, gw.created_at, gw.updated_at,
                    gw.max_triggers, gw.triggered_count, gw.expires_at,
                    p.name AS prize_name, p.emoji AS prize_emoji
             FROM guaranteed_wins gw
@@ -366,8 +376,8 @@ class GuaranteedWin:
              max_triggers, triggered_count, expires_at, status)
             VALUES (:prize_id, :scheduled_at, :target_identifier, :reason, :priority, :created_by,
                     :max_triggers, 0, :expires_at, 'pending')
-            RETURNING id, prize_id, scheduled_at, target_identifier, reason, status, priority, 
-                      max_triggers, triggered_count, expires_at, created_at
+            RETURNING id, prize_id, scheduled_at, target_identifier, reason, status, priority,
+                      max_triggers, triggered_count, expires_at, created_at, updated_at
         """
         results = execute_sql(sql, {
             'prize_id': prize_id,
@@ -428,23 +438,33 @@ class GuaranteedWin:
         return count
     
     @staticmethod
-    def update(win_id, **kwargs):
-        """Update a guaranteed win (only if pending)"""
+    def update(win_id, expected_updated_at=None, **kwargs):
+        """
+        Update a guaranteed win (only if pending).
+
+        expected_updated_at: optimistic-concurrency check - when given,
+        the update only applies if the row's updated_at still matches.
+        """
         allowed_fields = ['scheduled_at', 'target_identifier', 'reason', 'priority']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
-        
+
         if not updates:
             return None
-        
+
         set_clauses = [f"{k} = :{k}" for k in updates.keys()]
         updates['win_id'] = win_id
-        
+
+        where_clause = "WHERE id = :win_id AND status = 'pending'"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            updates['expected_updated_at'] = expected_updated_at
+
         sql = f"""
             UPDATE guaranteed_wins
             SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :win_id AND status = 'pending'
-            RETURNING id, prize_id, scheduled_at, target_identifier, reason, status, priority
+            {where_clause}
+            RETURNING id, prize_id, scheduled_at, target_identifier, reason, status, priority, updated_at
         """
-        
+
         results = execute_sql(sql, updates)
         return results[0] if results else None
