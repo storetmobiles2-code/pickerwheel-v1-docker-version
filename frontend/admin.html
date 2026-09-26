@@ -840,7 +840,6 @@
                             <thead>
                                 <tr>
                                     <th>Prize</th>
-                                    <th>Category</th>
                                     <th>Budget Tier</th>
                                     <th>Quantity</th>
                                     <th>Daily Limit</th>
@@ -898,7 +897,7 @@
                             <thead>
                                 <tr>
                                     <th>Prize</th>
-                                    <th>Category</th>
+                                    <th>Budget Tier</th>
                                     <th>Quantity</th>
                                     <th>Daily Limit</th>
                                     <th>Enabled</th>
@@ -1051,12 +1050,6 @@
                     <div class="form-group">
                 <label>Prize Name</label>
                             <input type="text" id="newPrizeName" placeholder="Enter prize name">
-                    </div>
-                    <div class="form-group">
-                <label>Category</label>
-                            <select id="newPrizeCategory">
-                                <option value="">Loading categories...</option>
-                            </select>
                     </div>
                     <div class="form-group">
                 <label>Budget Tier</label>
@@ -1510,7 +1503,6 @@
         let authPassword = null;
         let adminActor = null;
         let prizesData = [];
-        let categoriesData = [];
 
         // Who's making changes from this browser, for the audit log (see
         // backend's log_audit()/_actor()). Everyone shares one admin
@@ -1642,7 +1634,6 @@
                     document.getElementById('loginSection').style.display = 'none';
                     document.getElementById('adminContent').classList.add('show');
                     document.getElementById('headerActions').style.display = 'block';
-                    loadCategories();
                     loadPrizes();
                     loadStats();
                     connectLiveUpdates();
@@ -1770,18 +1761,6 @@
             return response.json();
         }
 
-        // Load Categories
-        async function loadCategories() {
-            try {
-                const data = await apiGet('/admin/categories');
-                if (data.success) {
-                    categoriesData = data.categories;
-                }
-            } catch (error) {
-                console.error('Error loading categories:', error);
-            }
-        }
-
         // Load Prizes
         async function loadPrizes() {
             try {
@@ -1792,8 +1771,6 @@
                         id: item.prize_id || item.id,
                         name: item.prize_name || item.name,
                         emoji: item.emoji || '🎁',
-                        category_name: item.category_name,
-                        category_display: item.category_display,
                         budget_tier: item.budget_tier || 'budget',
                         is_enabled: item.is_enabled,
                         is_active: item.is_active,
@@ -1847,9 +1824,6 @@
                                 <span>ID: ${prize.id}</span>
                             </div>
                         </div>
-                    </td>
-                    <td>
-                        <span class="badge badge-${prize.category_name}">${prize.category_display || prize.category_name}</span>
                     </td>
                     <td>
                         <select class="tier-select badge-${prize.budget_tier}" onchange="updatePrizeTier(${prize.id}, this.value)" title="Admin-panel price grouping - does not affect win odds">
@@ -2131,25 +2105,12 @@
         }
 
         // Add Prize
-        async function showAddPrizeModal() {
-            // Categories are loaded from the API rather than hardcoded here,
-            // since their IDs are assigned by the database and don't
-            // reliably match any fixed 1/2/3 ordering (picking the wrong
-            // one silently mis-categorizes the prize - wrong default
-            // inventory, wrong win odds).
-            if (!categoriesData.length) {
-                await loadCategories();
-            }
-            const select = document.getElementById('newPrizeCategory');
-            select.innerHTML = categoriesData.length
-                ? categoriesData.map(c => `<option value="${c.id}">${escapeHtml(c.display_name || c.name)}</option>`).join('')
-                : '<option value="">No categories found</option>';
+        function showAddPrizeModal() {
             document.getElementById('addPrizeModal').classList.add('show');
         }
 
         async function addPrize() {
             const name = document.getElementById('newPrizeName').value.trim();
-            const categoryId = parseInt(document.getElementById('newPrizeCategory').value);
             const budgetTier = document.getElementById('newPrizeBudgetTier').value;
             const emoji = document.getElementById('newPrizeEmoji').value || '🎁';
             const quantity = parseInt(document.getElementById('newPrizeQuantity').value);
@@ -2161,9 +2122,10 @@
             }
 
             try {
+                // category_id is derived server-side from budget_tier -
+                // the admin panel no longer sends or asks for it
                 const data = await apiPost('/admin/prizes', {
                     name,
-                    category_id: categoryId,
                     budget_tier: budgetTier,
                     emoji,
                     initial_quantity: quantity,
@@ -2273,17 +2235,18 @@
             // Reset theme form
             resetThemeForm();
             
-            // Load rare and ultra rare prizes
-            const rareAndUltra = prizesData.filter(p => p.category_name === 'rare' || p.category_name === 'ultra_rare');
-            
+            // Load mid-budget and high-end prizes (the higher-value tiers,
+            // suited to a special-event weight boost)
+            const rareAndUltra = prizesData.filter(p => p.budget_tier === 'mid_budget' || p.budget_tier === 'high_end');
+
             document.getElementById('eventPrizesSelector').innerHTML = rareAndUltra.length ? rareAndUltra.map(prize => `
                 <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; cursor: pointer; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
                     <input type="checkbox" value="${prize.prize_id || prize.id}" class="event-prize-checkbox" style="width: auto;">
                     <span style="font-size: 1.2rem;">${prize.emoji || '🎁'}</span>
                     <span style="flex: 1;">${escapeHtml(prize.name)}</span>
-                    <span class="badge badge-${prize.category_name}">${prize.category_display || prize.category_name}</span>
+                    <span class="badge badge-${prize.budget_tier}">${TIER_LABELS[prize.budget_tier] || prize.budget_tier}</span>
                 </label>
-            `).join('') : '<p style="color: var(--text-secondary);">No rare/ultra rare prizes available</p>';
+            `).join('') : '<p style="color: var(--text-secondary);">No mid-budget/high-end prizes available</p>';
             
             document.getElementById('addEventModal').classList.add('show');
         }
@@ -2722,7 +2685,7 @@
                                     <span id="prize-name-${p.prize_id}">${escapeHtml(p.prize_name)}</span>
                                     <button class="btn-icon-tiny" onclick="showEditTemplatePrizeModal(${p.prize_id}, '${p.prize_name.replace(/'/g, "\\'")}', '${p.emoji || '🎁'}')" title="Edit prize name">✏️</button>
                                 </td>
-                                <td><span class="badge badge-${p.category_name}">${p.category_name}</span></td>
+                                <td><span class="badge badge-${p.budget_tier}">${TIER_LABELS[p.budget_tier] || p.budget_tier}</span></td>
                                 <td>
                                     <div class="qty-control">
                                         <button class="qty-btn minus" onclick="updateTemplatePrizeQty(${p.id}, ${p.quantity - 1})">−</button>
@@ -3149,7 +3112,7 @@
                         <div>
                             <span style="font-size: 1.2rem; margin-right: 0.5rem;">${w.prize_emoji || '🎁'}</span>
                             <strong>${escapeHtml(w.prize_name)}</strong>
-                            <span class="badge badge-${w.category_name}" style="margin-left: 0.5rem;">${w.category_name}</span>
+                            <span class="badge badge-${w.budget_tier}" style="margin-left: 0.5rem;">${TIER_LABELS[w.budget_tier] || w.budget_tier}</span>
                             ${progressInfo}
                             <br>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">
@@ -3203,7 +3166,7 @@
             selector.innerHTML = '<option value="">Select a prize...</option>';
             prizesData.forEach(p => {
                 const prizeId = p.id || p.prize_id;
-                selector.innerHTML += `<option value="${prizeId}">${p.emoji || '🎁'} ${p.name} (${p.category_name})</option>`;
+                selector.innerHTML += `<option value="${prizeId}">${p.emoji || '🎁'} ${p.name} (${TIER_LABELS[p.budget_tier] || p.budget_tier})</option>`;
             });
             
             // Reset all fields
@@ -3373,7 +3336,7 @@
                                     <tr>
                                         <th>Time</th>
                                         <th>Prize</th>
-                                        <th>Category</th>
+                                        <th>Budget Tier</th>
                                         <th>User</th>
                             </tr>
                         </thead>
@@ -3382,7 +3345,7 @@
                                         <tr>
                                             <td>${new Date(t.created_at).toLocaleTimeString()}</td>
                                             <td>${t.emoji || '🎁'} ${escapeHtml(t.prize_name)}</td>
-                                            <td><span class="badge badge-${t.category_name}">${t.category_name}</span></td>
+                                            <td><span class="badge badge-${t.budget_tier}">${TIER_LABELS[t.budget_tier] || t.budget_tier}</span></td>
                                             <td style="font-family: monospace; font-size: 0.8rem;">${(t.user_identifier || 'Anonymous').substring(0, 20)}</td>
                     </tr>
                                     `).join('')}

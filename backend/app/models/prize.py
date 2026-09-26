@@ -10,6 +10,21 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
+# category_id (ultra_rare/rare/common) drives win-odds weighting in
+# SpinService.select_winning_prize() and is still required at the DB
+# level (NOT NULL FK). budget_tier (high_end/mid_budget/budget) is the
+# admin-facing grouping - the two were originally independent, but they
+# map 1:1 by convention (see schema/004_seed_data.sql), so the admin
+# panel no longer asks anyone to pick category separately: it's derived
+# from budget_tier via this mapping instead, keeping the odds engine
+# (and every existing category-keyed query/stat) working unchanged while
+# "category" stops being a concept admins see or set.
+BUDGET_TIER_TO_CATEGORY_ID = {
+    'high_end': 1,    # ultra_rare - 15% win-odds weight
+    'mid_budget': 2,  # rare - 35% win-odds weight
+    'budget': 3,      # common - 50% win-odds weight
+}
+
 
 class PrizeCategory:
     """Prize category model"""
@@ -86,8 +101,20 @@ class Prize:
         return results or []
     
     @staticmethod
-    def create(name, category_id, emoji='🎁', description=None, display_order=0, budget_tier='budget'):
-        """Create a new prize"""
+    def create(name, category_id=None, emoji='🎁', description=None, display_order=0, budget_tier='budget'):
+        """
+        Create a new prize.
+
+        category_id: normally left as None - it's derived from budget_tier
+        via BUDGET_TIER_TO_CATEGORY_ID, since the admin panel no longer
+        exposes category as something to pick separately. Still accepted
+        explicitly for internal callers (e.g. test fixtures building
+        specific rarity scenarios) that need to set it independently of
+        budget_tier.
+        """
+        if category_id is None:
+            category_id = BUDGET_TIER_TO_CATEGORY_ID.get(budget_tier, 3)
+
         sql = """
             INSERT INTO prizes (name, category_id, emoji, description, display_order, budget_tier, is_active, is_enabled)
             VALUES (:name, :category_id, :emoji, :description, :display_order, :budget_tier, TRUE, TRUE)
@@ -132,6 +159,14 @@ class Prize:
 
         if not updates:
             return None
+
+        # Keep category_id in lockstep with budget_tier (see
+        # BUDGET_TIER_TO_CATEGORY_ID) so win-odds weighting never drifts
+        # out of sync with the tier an admin actually changed - unless
+        # the caller is explicitly setting category_id itself in this
+        # same call, in which case that explicit value wins.
+        if 'budget_tier' in updates and 'category_id' not in updates:
+            updates['category_id'] = BUDGET_TIER_TO_CATEGORY_ID.get(updates['budget_tier'], 3)
 
         set_clause = ', '.join([f"{k} = :{k}" for k in updates.keys()])
         updates['id'] = prize_id

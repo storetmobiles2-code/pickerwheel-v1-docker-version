@@ -92,7 +92,6 @@ def add_prize():
         data = request.get_json() or {}
         
         name = data.get('name')
-        category_id = data.get('category_id')
         emoji = data.get('emoji', '🎁')
         description = data.get('description')
         display_order = data.get('display_order', 0)
@@ -100,10 +99,10 @@ def add_prize():
         daily_limit = data.get('daily_limit', 5)
         budget_tier = data.get('budget_tier', 'budget')
 
-        if not name or not category_id:
+        if not name:
             return jsonify({
                 'success': False,
-                'error': 'Name and category_id are required'
+                'error': 'Name is required'
             }), 400
 
         if budget_tier not in ('budget', 'mid_budget', 'high_end'):
@@ -126,8 +125,9 @@ def add_prize():
                 'error': 'initial_quantity and daily_limit must be non-negative'
             }), 400
 
-        # Create prize
-        prize = Prize.create(name, category_id, emoji, description, display_order, budget_tier)
+        # Create prize - category_id is derived from budget_tier
+        # (BUDGET_TIER_TO_CATEGORY_ID), never taken from the client
+        prize = Prize.create(name, None, emoji, description, display_order, budget_tier)
 
         if not prize:
             return jsonify({
@@ -140,7 +140,7 @@ def add_prize():
         # category defaults
         event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
         InventoryService.initialize_inventory_for_prize(
-            prize['id'], category_id, event_id,
+            prize['id'], prize['category_id'], event_id,
             start_date=date.today(), days=30,
             initial_quantity=initial_quantity, daily_limit=daily_limit
         )
@@ -294,8 +294,11 @@ def update_prize(prize_id):
     try:
         data = request.get_json() or {}
 
-        # Remove admin_password from update data
-        update_data = {k: v for k, v in data.items() if k != 'admin_password'}
+        # Remove admin_password from update data. category_id is also
+        # dropped here even if a client sends it - it's derived from
+        # budget_tier (see Prize.update()), not independently settable
+        # through this API.
+        update_data = {k: v for k, v in data.items() if k not in ('admin_password', 'category_id')}
 
         if 'budget_tier' in update_data and update_data['budget_tier'] not in ('budget', 'mid_budget', 'high_end'):
             return jsonify({
