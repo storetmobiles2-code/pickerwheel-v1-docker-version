@@ -90,15 +90,16 @@ def register_handlers(socketio):
             return
         try:
             name = data.get('name')
-            category_id = data.get('category_id')
             emoji = data.get('emoji', '🎁')
             description = data.get('description')
-            
-            if not name or not category_id:
-                emit('admin:error', {'message': 'Name and category are required'})
+            budget_tier = data.get('budget_tier', 'budget')
+
+            if not name:
+                emit('admin:error', {'message': 'Name is required'})
                 return
-            
-            prize = Prize.create(name, category_id, emoji, description)
+
+            # category_id is derived from budget_tier (BUDGET_TIER_TO_CATEGORY_ID)
+            prize = Prize.create(name, None, emoji, description, budget_tier=budget_tier)
             
             if prize:
                 # Get updated prize list

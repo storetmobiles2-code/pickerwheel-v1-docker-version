@@ -59,8 +59,8 @@ class Transaction:
         sql = """
             SELECT t.id, t.prize_id, t.user_identifier, t.transaction_type,
                    t.quantity, t.metadata, t.created_at,
-                   p.name as prize_name, p.emoji, pc.name as category_name,
-                   pc.display_name as category_display
+                   p.name as prize_name, p.emoji, p.budget_tier,
+                   pc.name as category_name, pc.display_name as category_display
             FROM transactions t
             JOIN prizes p ON t.prize_id = p.id
             JOIN prize_categories pc ON p.category_id = pc.id

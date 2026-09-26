@@ -4,11 +4,15 @@ Admin prize and inventory management.
 Happy path:
   - add-prize honors the admin-entered quantity/daily_limit (regression:
     these used to be silently dropped in favor of category defaults)
+  - add-prize derives category_id from budget_tier - the admin panel
+    deprecated category as something a client sets directly (see
+    BUDGET_TIER_TO_CATEGORY_ID in app/models/prize.py); a client-supplied
+    category_id is silently ignored, not applied
   - set-inventory updates quantity and daily_limit together in one call
   - toggle/update/delete a prize
   - replenish resets remaining_quantity back to initial_quantity
 Failure path:
-  - add-prize rejects a missing name/category_id
+  - add-prize rejects a missing name
   - add-prize rejects a negative/non-numeric quantity or daily_limit
   - set-inventory rejects a negative/non-numeric quantity
   - set-inventory on a prize with no inventory row returns 404
@@ -21,7 +25,7 @@ from app.database import execute_sql
 def test_add_prize_happy_path_honors_admin_quantity(client, admin_headers):
     resp = client.post('/api/admin/prizes', json={
         'name': 'Custom Quantity Prize',
-        'category_id': 3,
+        'budget_tier': 'high_end',
         'initial_quantity': 17,
         'daily_limit': 6,
     }, headers=admin_headers)
@@ -29,6 +33,11 @@ def test_add_prize_happy_path_honors_admin_quantity(client, admin_headers):
     body = resp.get_json()
     assert body['success'] is True
     prize_id = body['prize']['id']
+
+    # category_id is derived from budget_tier (high_end -> 1/ultra_rare),
+    # never taken from the client
+    prize_row = execute_sql('SELECT category_id FROM prizes WHERE id = :id', {'id': prize_id})[0]
+    assert prize_row['category_id'] == 1
 
     row = execute_sql(
         'SELECT initial_quantity, remaining_quantity, daily_limit FROM prize_inventory '
@@ -40,12 +49,25 @@ def test_add_prize_happy_path_honors_admin_quantity(client, admin_headers):
     assert row['daily_limit'] == 6
 
 
-def test_add_prize_requires_name_and_category(client, admin_headers):
-    resp = client.post('/api/admin/prizes', json={'category_id': 3}, headers=admin_headers)
-    assert resp.status_code == 400
+def test_add_prize_ignores_client_supplied_category_id(client, admin_headers):
+    """A client sending category_id (an old integration, or a stale
+    frontend build) must not be able to set it directly anymore - it's
+    silently ignored and derived from budget_tier instead."""
+    resp = client.post('/api/admin/prizes', json={
+        'name': 'Client Sent Category',
+        'budget_tier': 'budget',
+        'category_id': 999,  # would violate the FK if it were ever used
+    }, headers=admin_headers)
+    assert resp.status_code == 200
+    prize_id = resp.get_json()['prize']['id']
 
-    resp2 = client.post('/api/admin/prizes', json={'name': 'No Category'}, headers=admin_headers)
-    assert resp2.status_code == 400
+    prize_row = execute_sql('SELECT category_id FROM prizes WHERE id = :id', {'id': prize_id})[0]
+    assert prize_row['category_id'] == 3  # derived from budget_tier='budget', not 999
+
+
+def test_add_prize_requires_name(client, admin_headers):
+    resp = client.post('/api/admin/prizes', json={'budget_tier': 'budget'}, headers=admin_headers)
+    assert resp.status_code == 400
 
 
 def test_add_prize_rejects_negative_quantity(client, admin_headers):

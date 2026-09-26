@@ -627,12 +627,13 @@ class PickerWheelUI {
             console.log(`  ${index}: ${segment.name} (ID: ${segment.id}) - ${segment.startAngle.toFixed(1)}° to ${segment.endAngle.toFixed(1)}°`);
         });
         
-        // Debug: Log available prizes by category
+        // Debug: Log available prizes by budget tier
         const breakdown = this.availablePrizes.reduce((acc, prize) => {
-            acc[prize.category] = (acc[prize.category] || 0) + 1;
+            const tier = prize.budget_tier || 'unknown';
+            acc[tier] = (acc[tier] || 0) + 1;
             return acc;
         }, {});
-        console.log('📊 Available prizes by category:', breakdown);
+        console.log('📊 Available prizes by budget tier:', breakdown);
 
         // Create SVG wheel for precise segments
         this.createSVGWheel();
@@ -1593,7 +1594,7 @@ class PickerWheelUI {
         console.log(`   Prize ID: ${prizeToDisplay.id}`);
         console.log(`   Prize name: ${prizeToDisplay.name}`);
         console.log(`   Prize emoji: ${prizeToDisplay.emoji}`);
-        console.log(`   Prize category: ${prizeToDisplay.category}`);
+        console.log(`   Prize budget tier: ${prizeToDisplay.budget_tier}`);
         console.log(`   Server message: ${prizeToDisplay.serverMessage}`);
         console.log(`   Is server authorized: ${prizeToDisplay.isServerAuthorized}`);
         
@@ -1956,7 +1957,7 @@ class PickerWheelUI {
         console.log(`   Prize ID: ${prize.id}`);
         console.log(`   Prize name: ${prize.name}`);
         console.log(`   Prize emoji: ${prize.emoji}`);
-        console.log(`   Prize category: ${prize.category}`);
+        console.log(`   Prize budget tier: ${prize.budget_tier}`);
 
         const prizeEmoji = document.getElementById('prizeEmoji');
         const prizeName = document.getElementById('prizeName');
@@ -1988,7 +1989,7 @@ class PickerWheelUI {
     
     // 🎉 ENHANCED CELEBRATION SYSTEM
     startCelebrationSequence(prize) {
-        console.log('🎉 Starting celebration sequence for:', prize.name, 'Category:', prize.category);
+        console.log('🎉 Starting celebration sequence for:', prize.name, 'Budget tier:', prize.budget_tier);
         
         // Stop any ongoing sounds first
         this.stopTickingSound();
@@ -2063,7 +2064,7 @@ class PickerWheelUI {
                         });
                 }
             } else {
-                console.warn('⚠️ No sound element available for category:', category);
+                console.warn('⚠️ No sound element available for prize rarity:', category);
             }
         } catch (error) {
             console.warn('⚠️ Error playing celebration sound:', error);

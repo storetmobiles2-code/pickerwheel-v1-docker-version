@@ -63,8 +63,8 @@ class DailyPrizeTemplate:
         """Get prizes for a template"""
         sql = """
             SELECT tp.id, tp.prize_id, tp.quantity, tp.daily_limit, tp.is_enabled,
-                   p.name AS prize_name, p.emoji, pc.name AS category_name,
-                   pc.display_name AS category_display
+                   p.name AS prize_name, p.emoji, p.budget_tier,
+                   pc.name AS category_name, pc.display_name AS category_display
             FROM template_prizes tp
             JOIN prizes p ON tp.prize_id = p.id
             JOIN prize_categories pc ON p.category_id = pc.id
@@ -323,7 +323,7 @@ class GuaranteedWin:
                    gw.reason, gw.status, gw.priority, gw.triggered_at,
                    gw.triggered_by_user, gw.created_by, gw.created_at, gw.updated_at,
                    gw.max_triggers, gw.triggered_count, gw.expires_at,
-                   p.name AS prize_name, p.emoji AS prize_emoji,
+                   p.name AS prize_name, p.emoji AS prize_emoji, p.budget_tier,
                    pc.name AS category_name
             FROM guaranteed_wins gw
             JOIN prizes p ON gw.prize_id = p.id
