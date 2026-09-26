@@ -3,6 +3,10 @@ Admin special events.
 
 Happy path:
   - creating an event with a theme and prizes lands all three atomically
+  - toggling activates/deactivates
+  - deleting removes the event and cascades to its prize links
+  - resetting theme_config clears it back to {}
+  - adding/removing a prize updates the special_event_prizes link table
 Failure path:
   - a bad prize_id in the create payload rolls back the whole event
     (regression: this used to leave a half-configured event behind -
@@ -12,6 +16,9 @@ Failure path:
   - an invalid start_datetime/end_datetime is rejected with 400, not
     silently passed through (regression: it used to be swallowed and
     the raw string passed to the DB)
+  - toggle/theme-reset/add-prize reject a missing required field
+  - toggle/delete/remove-prize on a nonexistent event or link is a clean
+    404, not a 500
 """
 from datetime import datetime, timedelta
 
@@ -127,3 +134,139 @@ def test_update_special_event_rejects_invalid_datetime(client, admin_headers, ma
         'SELECT start_datetime FROM special_events WHERE id = :id', {'id': event_id}
     )[0]
     assert row['start_datetime'] is not None
+
+
+def _create_event(client, admin_headers, name, **extra):
+    now = datetime.utcnow()
+    payload = {
+        'name': name,
+        'start_datetime': _iso(now),
+        'end_datetime': _iso(now + timedelta(days=1)),
+    }
+    payload.update(extra)
+    return client.post('/api/admin/special-events', json=payload, headers=admin_headers).get_json()['event']
+
+
+# ---- Toggle ----
+
+def test_toggle_special_event_activates_and_deactivates(client, admin_headers):
+    event = _create_event(client, admin_headers, 'Toggle Test Event')
+
+    off = client.post(f'/api/admin/special-events/{event["id"]}/toggle',
+                       json={'is_active': False}, headers=admin_headers)
+    assert off.status_code == 200
+    assert off.get_json()['event']['is_active'] is False
+    row = execute_sql('SELECT is_active FROM special_events WHERE id = :id', {'id': event['id']})[0]
+    assert row['is_active'] is False
+
+    on = client.post(f'/api/admin/special-events/{event["id"]}/toggle',
+                      json={'is_active': True}, headers=admin_headers)
+    assert on.status_code == 200
+    assert on.get_json()['event']['is_active'] is True
+
+
+def test_toggle_special_event_requires_is_active(client, admin_headers):
+    event = _create_event(client, admin_headers, 'Toggle Missing Field Event')
+    resp = client.post(f'/api/admin/special-events/{event["id"]}/toggle', json={}, headers=admin_headers)
+    assert resp.status_code == 400
+
+
+def test_toggle_nonexistent_special_event_returns_404(client, admin_headers):
+    resp = client.post('/api/admin/special-events/999999/toggle',
+                        json={'is_active': True}, headers=admin_headers)
+    assert resp.status_code == 404
+
+
+# ---- Delete ----
+
+def test_delete_special_event_removes_it_and_cascades_prize_links(client, admin_headers, make_prize):
+    prize = make_prize()
+    event = _create_event(client, admin_headers, 'Delete Test Event', prize_ids=[prize['id']])
+
+    resp = client.delete(f'/api/admin/special-events/{event["id"]}', headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+
+    remaining = execute_sql(
+        'SELECT COUNT(*) AS n FROM special_events WHERE id = :id', {'id': event['id']}
+    )[0]['n']
+    assert remaining == 0
+
+    linked = execute_sql(
+        'SELECT COUNT(*) AS n FROM special_event_prizes WHERE special_event_id = :id',
+        {'id': event['id']}
+    )[0]['n']
+    assert linked == 0  # ON DELETE CASCADE, not left orphaned
+
+
+def test_delete_nonexistent_special_event_returns_404(client, admin_headers):
+    resp = client.delete('/api/admin/special-events/999999', headers=admin_headers)
+    assert resp.status_code == 404
+
+
+# ---- Theme reset ----
+
+def test_reset_event_theme_clears_it_back_to_empty(client, admin_headers):
+    event = _create_event(client, admin_headers, 'Theme Reset Event',
+                           theme_config={'primaryColor': '#123456'})
+
+    resp = client.delete(f'/api/admin/special-events/{event["id"]}/theme', json={
+        'expected_updated_at': event['updated_at'],
+    }, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()['event']['theme_config'] == {}
+
+    row = execute_sql(
+        'SELECT theme_config FROM special_events WHERE id = :id', {'id': event['id']}
+    )[0]
+    assert row['theme_config'] == {}
+
+
+def test_reset_event_theme_requires_expected_updated_at(client, admin_headers):
+    event = _create_event(client, admin_headers, 'Theme Reset No Version Event',
+                           theme_config={'primaryColor': '#abcdef'})
+    resp = client.delete(f'/api/admin/special-events/{event["id"]}/theme', json={}, headers=admin_headers)
+    assert resp.status_code == 400
+
+
+# ---- Prize linking ----
+
+def test_add_prize_to_event_and_remove_prize_from_event(client, admin_headers, make_prize):
+    prize = make_prize()
+    event = _create_event(client, admin_headers, 'Prize Link Event')
+
+    add = client.post(f'/api/admin/special-events/{event["id"]}/prizes', json={
+        'prize_id': prize['id'], 'weight_multiplier': 3.0,
+    }, headers=admin_headers)
+    assert add.status_code == 200
+    assert add.get_json()['event_prize']['prize_id'] == prize['id']
+
+    linked = execute_sql(
+        'SELECT COUNT(*) AS n FROM special_event_prizes WHERE special_event_id = :e AND prize_id = :p',
+        {'e': event['id'], 'p': prize['id']}
+    )[0]['n']
+    assert linked == 1
+
+    remove = client.delete(f'/api/admin/special-events/{event["id"]}/prizes/{prize["id"]}',
+                            headers=admin_headers)
+    assert remove.status_code == 200
+
+    linked_after = execute_sql(
+        'SELECT COUNT(*) AS n FROM special_event_prizes WHERE special_event_id = :e AND prize_id = :p',
+        {'e': event['id'], 'p': prize['id']}
+    )[0]['n']
+    assert linked_after == 0
+
+
+def test_add_prize_to_event_requires_prize_id(client, admin_headers):
+    event = _create_event(client, admin_headers, 'Missing Prize ID Event')
+    resp = client.post(f'/api/admin/special-events/{event["id"]}/prizes', json={}, headers=admin_headers)
+    assert resp.status_code == 400
+
+
+def test_remove_prize_not_linked_to_event_returns_404(client, admin_headers, make_prize):
+    prize = make_prize()
+    event = _create_event(client, admin_headers, 'No Link Event')
+    resp = client.delete(f'/api/admin/special-events/{event["id"]}/prizes/{prize["id"]}',
+                          headers=admin_headers)
+    assert resp.status_code == 404
