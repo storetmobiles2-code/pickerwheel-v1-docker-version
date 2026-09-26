@@ -113,6 +113,42 @@ def test_prize_depleted_after_scheduling_leaves_guaranteed_win_pending(client, a
     assert tx_count == 0
 
 
+def test_prize_disabled_after_scheduling_leaves_guaranteed_win_pending(client, admin_headers, make_prize):
+    """Regression test for a real bug: consume_prize() checked stock and
+    daily_limit but never is_enabled, so a guaranteed win pointed at a
+    prize an admin disabled after scheduling (e.g. via the budget-tier
+    master toggle) still fired and awarded it. Same shape as the
+    depletion regression above, but for is_enabled instead of stock."""
+    prize = make_prize(quantity=5, daily_limit=5)
+    win_id = _create_guaranteed_win(client, admin_headers, prize['id']).get_json()['win']['id']
+
+    # Disable it out from under the guaranteed win (simulates an admin
+    # disabling the prize, or its whole budget tier, after scheduling)
+    execute_sql('UPDATE prizes SET is_enabled = FALSE WHERE id = :id', {'id': prize['id']})
+
+    spin = client.post('/api/spin', json={
+        'user_id': 'gw-user', 'prize_id': prize['id'], 'guaranteed_win_id': win_id
+    })
+    assert spin.status_code == 400
+    assert spin.get_json()['success'] is False
+
+    win_row = execute_sql(
+        'SELECT status, triggered_count FROM guaranteed_wins WHERE id = :id', {'id': win_id}
+    )[0]
+    assert win_row['status'] == 'pending'
+    assert win_row['triggered_count'] == 0
+
+    tx_count = execute_sql(
+        "SELECT COUNT(*) AS n FROM transactions WHERE prize_id = :id", {'id': prize['id']}
+    )[0]['n']
+    assert tx_count == 0
+
+    remaining = execute_sql(
+        'SELECT remaining_quantity FROM prize_inventory WHERE prize_id = :id', {'id': prize['id']}
+    )[0]['remaining_quantity']
+    assert remaining == 5  # untouched
+
+
 def test_replaying_a_triggered_guaranteed_win_is_rejected(client, admin_headers, make_prize):
     prize = make_prize(quantity=5, daily_limit=5)
     win_id = _create_guaranteed_win(client, admin_headers, prize['id']).get_json()['win']['id']

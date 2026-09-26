@@ -829,6 +829,12 @@
                             </select>
                 </div>
             </div>
+                    <!-- Master toggles: bulk-enable/disable every prize in a
+                         budget tier in one action. Reflects (and edits) the
+                         same per-prize is_enabled column the table below
+                         does - not a separate tier-level flag - so a prize
+                         can still be re-enabled individually afterwards. -->
+                    <div class="tier-master-toggles" id="tierMasterToggles" style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;"></div>
                     <div style="overflow-x: auto;">
                         <table class="prize-table">
                             <thead>
@@ -1818,6 +1824,8 @@
 
             if (!prizes) prizes = prizesData;
 
+            renderTierMasterToggles(prizes);
+
             const tierFilter = document.getElementById('tierFilter')?.value || 'all';
             const filtered = tierFilter === 'all' ? prizes : prizes.filter(p => p.budget_tier === tierFilter);
 
@@ -1876,6 +1884,57 @@
                     </td>
                 </tr>
             `).join('');
+        }
+
+        // Renders the 3 master toggle chips (budget / mid_budget / high_end).
+        // Each toggle's on/off state reflects whether every prize currently
+        // in that tier is enabled - there's no separate stored tier flag,
+        // so "off" just means "not all enabled" (includes fully-disabled
+        // and partially-disabled tiers alike).
+        function renderTierMasterToggles(prizes) {
+            const container = document.getElementById('tierMasterToggles');
+            if (!container) return;
+
+            container.innerHTML = Object.entries(TIER_LABELS).map(([tier, label]) => {
+                const tierPrizes = prizes.filter(p => p.budget_tier === tier);
+                const total = tierPrizes.length;
+                const enabledCount = tierPrizes.filter(p => p.is_enabled).length;
+                const allEnabled = total > 0 && enabledCount === total;
+
+                return `
+                    <div class="tier-master-toggle" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label class="toggle" title="${allEnabled ? `Disable all ${label.replace(/^\S+\s/, '')} prizes` : `Enable all ${label.replace(/^\S+\s/, '')} prizes`}">
+                            <input type="checkbox" ${allEnabled ? 'checked' : ''} ${total === 0 ? 'disabled' : ''}
+                                   onchange="toggleTierMaster('${tier}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span style="font-size: 0.85rem; color: var(--text-secondary);">${label} (${enabledCount}/${total} enabled)</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleTierMaster(tier, isEnabled) {
+            const label = TIER_LABELS[tier] || tier;
+            const action = isEnabled ? 'Enable' : 'Disable';
+            if (!confirm(`${action} ALL ${label} prizes? This affects every prize in this tier and cannot be selectively undone in one click.`)) {
+                renderTierMasterToggles(prizesData); // revert the checkbox visual on cancel
+                return;
+            }
+
+            try {
+                const data = await apiPost(`/admin/prizes/tier/${tier}/toggle`, { is_enabled: isEnabled });
+                if (data.success) {
+                    showToast(data.message || `${label} prizes ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
+                    loadPrizes();
+                } else {
+                    showToast(data.error || 'Failed to update tier', 'error');
+                    renderTierMasterToggles(prizesData);
+                }
+            } catch (error) {
+                showToast('Error updating tier', 'error');
+                renderTierMasterToggles(prizesData);
+            }
         }
 
         function updateStats(data) {

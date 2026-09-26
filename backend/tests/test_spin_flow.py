@@ -136,3 +136,34 @@ def test_disabled_prize_is_never_selected_by_prespin(client, make_prize):
     # returning a disabled prize
     assert resp.status_code == 400
     assert resp.get_json()['success'] is False
+
+
+def test_spin_rejects_a_prize_disabled_after_prespin_selected_it(client, make_prize):
+    """Regression test: pre-spin correctly excludes disabled prizes, but
+    the wheel animation takes several seconds between pre-spin picking a
+    prize and spin actually awarding it. If an admin disables that prize
+    (or its whole budget tier, via the master toggle) during that
+    window, consume_prize() used to have no reason to refuse - it only
+    checked stock and daily_limit, never is_enabled - so the disabled
+    prize was still awarded. Simulates that race directly: pre-spin
+    would have selected this prize while it was enabled; by the time
+    /spin fires, it no longer is."""
+    prize = make_prize(quantity=10, daily_limit=5, is_enabled=True)
+
+    execute_sql('UPDATE prizes SET is_enabled = FALSE WHERE id = :id', {'id': prize['id']})
+
+    resp = client.post('/api/spin', json={'user_id': 'race-user', 'prize_id': prize['id']})
+    assert resp.status_code == 400
+    assert resp.get_json()['success'] is False
+
+    remaining = execute_sql(
+        'SELECT remaining_quantity FROM prize_inventory WHERE prize_id = :id',
+        {'id': prize['id']}
+    )[0]['remaining_quantity']
+    assert remaining == 10  # untouched - no award happened
+
+    tx_count = execute_sql(
+        "SELECT COUNT(*) AS n FROM transactions WHERE prize_id = :id AND transaction_type = 'win'",
+        {'id': prize['id']}
+    )[0]['n']
+    assert tx_count == 0
