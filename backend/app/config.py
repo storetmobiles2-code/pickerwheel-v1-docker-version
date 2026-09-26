@@ -57,10 +57,23 @@ class ProductionConfig(Config):
 
 
 class TestingConfig(Config):
-    """Testing configuration"""
+    """
+    Testing configuration.
+
+    NOTE: DATABASE_URL on the base Config is a plain string computed once
+    from Config's own DB_NAME - overriding DB_NAME alone on a subclass
+    does NOT change it, since Python class attributes aren't re-derived
+    for subclasses. DATABASE_URL must be overridden explicitly here too,
+    or tests would silently run against the same database as
+    development/production.
+    """
     DEBUG = True
     TESTING = True
     DB_NAME = 'pickerwheel_test'
+    DATABASE_URL = os.environ.get(
+        'TEST_DATABASE_URL',
+        f'postgresql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{DB_NAME}'
+    )
 
 
 # Configuration dictionary
