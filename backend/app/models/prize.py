@@ -175,7 +175,30 @@ class Prize:
             })
         
         return results[0] if results else None
-    
+
+    @staticmethod
+    def toggle_enabled_by_tier(budget_tier, is_enabled):
+        """
+        Enable or disable every prize in a budget tier at once (the
+        Prize Management master toggle) - e.g. flipping high_end off
+        takes every high-end prize out of win contention in one action,
+        without the admin having to know which ones were already
+        individually disabled. Prizes remain individually toggleable
+        afterwards; this is a bulk convenience over the same is_enabled
+        column, not a separate tier-level flag.
+        """
+        sql = """
+            UPDATE prizes SET is_enabled = :is_enabled, updated_at = CURRENT_TIMESTAMP
+            WHERE budget_tier = :budget_tier AND is_active = TRUE
+            RETURNING id, name, is_enabled
+        """
+        results = execute_sql(sql, {'budget_tier': budget_tier, 'is_enabled': is_enabled}) or []
+
+        if results:
+            logger.info(f"Bulk {'enabled' if is_enabled else 'disabled'} {len(results)} prizes in tier {budget_tier}")
+
+        return results
+
     @staticmethod
     def delete(prize_id):
         """Soft delete a prize (set is_active = FALSE)"""

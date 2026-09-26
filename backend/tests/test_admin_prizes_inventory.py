@@ -77,6 +77,51 @@ def test_toggle_nonexistent_prize_returns_404(client, admin_headers):
     assert resp.status_code == 404
 
 
+def test_master_toggle_disables_every_prize_in_tier(client, admin_headers, make_prize):
+    high_1 = make_prize(name='High 1')
+    high_2 = make_prize(name='High 2')
+    budget_prize = make_prize(name='Budget Prize')
+    execute_sql("UPDATE prizes SET budget_tier = 'high_end' WHERE id IN (:a, :b)",
+                {'a': high_1['id'], 'b': high_2['id']})
+
+    resp = client.post('/api/admin/prizes/tier/high_end/toggle',
+                        json={'is_enabled': False}, headers=admin_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body['success'] is True
+    assert body['affected_count'] == 2
+
+    rows = execute_sql('SELECT id, is_enabled FROM prizes WHERE id IN (:a, :b, :c)',
+                        {'a': high_1['id'], 'b': high_2['id'], 'c': budget_prize['id']})
+    by_id = {r['id']: r['is_enabled'] for r in rows}
+    assert by_id[high_1['id']] is False
+    assert by_id[high_2['id']] is False
+    assert by_id[budget_prize['id']] is True  # untouched - different tier
+
+
+def test_master_toggle_disabled_prize_can_still_be_individually_re_enabled(client, admin_headers, make_prize):
+    prize = make_prize()
+    execute_sql("UPDATE prizes SET budget_tier = 'high_end' WHERE id = :id", {'id': prize['id']})
+    client.post('/api/admin/prizes/tier/high_end/toggle', json={'is_enabled': False}, headers=admin_headers)
+
+    resp = client.post(f'/api/admin/prizes/{prize["id"]}/toggle',
+                        json={'is_enabled': True}, headers=admin_headers)
+    assert resp.status_code == 200
+    row = execute_sql('SELECT is_enabled FROM prizes WHERE id = :id', {'id': prize['id']})[0]
+    assert row['is_enabled'] is True
+
+
+def test_master_toggle_rejects_invalid_tier(client, admin_headers):
+    resp = client.post('/api/admin/prizes/tier/not_a_real_tier/toggle',
+                        json={'is_enabled': False}, headers=admin_headers)
+    assert resp.status_code == 400
+
+
+def test_master_toggle_requires_is_enabled(client, admin_headers):
+    resp = client.post('/api/admin/prizes/tier/budget/toggle', json={}, headers=admin_headers)
+    assert resp.status_code == 400
+
+
 def test_delete_prize_soft_deletes(client, admin_headers, make_prize):
     prize = make_prize()
     resp = client.delete(f'/api/admin/prizes/{prize["id"]}', headers=admin_headers)

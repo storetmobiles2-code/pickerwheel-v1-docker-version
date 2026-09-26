@@ -234,6 +234,59 @@ def toggle_prize(prize_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@admin_bp.route('/prizes/tier/<budget_tier>/toggle', methods=['POST'])
+@require_admin_auth
+def toggle_prize_tier(budget_tier):
+    """
+    Master toggle: enable or disable every prize in a budget tier
+    (budget / mid_budget / high_end) in one action. Prizes stay
+    individually toggleable afterwards - this is a bulk convenience
+    over the existing per-prize is_enabled flag, not a new tier-level
+    flag, so re-enabling one prize in an otherwise-disabled tier works
+    exactly like it does today.
+    """
+    try:
+        if budget_tier not in ('budget', 'mid_budget', 'high_end'):
+            return jsonify({
+                'success': False,
+                'error': 'budget_tier must be one of: budget, mid_budget, high_end'
+            }), 400
+
+        data = request.get_json() or {}
+        is_enabled = data.get('is_enabled')
+
+        if is_enabled is None:
+            return jsonify({
+                'success': False,
+                'error': 'is_enabled is required'
+            }), 400
+
+        results = Prize.toggle_enabled_by_tier(budget_tier, is_enabled)
+
+        # Broadcast + audit even when 0 prizes matched (an admin flipping
+        # an empty tier should still see it reflected, and an empty
+        # result isn't an error - just distinguish it in the message)
+        prizes = Prize.get_all()
+        RealtimeService.broadcast_prizes_updated(prizes)
+
+        log_audit('bulk_toggle_enabled', 'prize_tier', None, performed_by=_actor(),
+                   new_value={'budget_tier': budget_tier, 'is_enabled': is_enabled,
+                              'affected_count': len(results)})
+
+        status = 'enabled' if is_enabled else 'disabled'
+        logger.info(f"Admin {status} all '{budget_tier}' prizes ({len(results)} affected)")
+
+        return jsonify({
+            'success': True,
+            'affected_count': len(results),
+            'prizes': results,
+            'message': f'{len(results)} {budget_tier.replace("_", "-")} prize(s) {status}'
+        })
+    except Exception as e:
+        logger.error(f"Error toggling prize tier {budget_tier}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @admin_bp.route('/prizes/<int:prize_id>', methods=['PUT'])
 @require_admin_auth
 def update_prize(prize_id):
