@@ -171,6 +171,7 @@ RETURNS TABLE(
     name VARCHAR(255),
     category_name VARCHAR(50),
     category_display VARCHAR(100),
+    budget_tier VARCHAR(20),
     emoji VARCHAR(10),
     is_enabled BOOLEAN,
     remaining_quantity INTEGER,
@@ -180,11 +181,12 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         p.id AS prize_id,
         p.name,
         pc.name AS category_name,
         pc.display_name AS category_display,
+        p.budget_tier,
         p.emoji,
         p.is_enabled,
         COALESCE(pi.remaining_quantity, 0) AS remaining_quantity,
