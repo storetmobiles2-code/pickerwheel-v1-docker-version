@@ -9,13 +9,31 @@ from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 from ..models import Prize, PrizeCategory, Inventory, Transaction, SpecialEvent, DailyPrizeTemplate, DateTemplateAssignment, GuaranteedWin
 from ..services import InventoryService, SpinService, RealtimeService
-from ..database import execute_transaction, run_in_transaction
+from ..database import execute_transaction, run_in_transaction, log_audit
 from sqlalchemy import text
 import json
 
 logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
+
+
+def _actor():
+    """
+    The human-readable name of whoever is making this request, for the
+    audit log. Sent by admin.html as admin_actor once per browser session
+    (see connectLiveUpdates()/the actor-name prompt) - a real per-device/
+    per-person identity is the actual long-term fix (deferred item #18
+    on the multi-device board), but this at least makes 'who did this'
+    answerable without it, since every admin currently shares one
+    password and audit_log used to just say 'admin' for everything.
+    """
+    data = request.get_json(silent=True) or {}
+    return (
+        request.headers.get('X-Admin-Actor')
+        or data.get('admin_actor')
+        or 'unknown'
+    )
 
 
 def require_admin_auth(f):
@@ -269,11 +287,13 @@ def update_prize(prize_id):
                 'success': False,
                 'error': 'This prize was changed by someone else - reload and try again'
             }), 409
-        
+
+        log_audit('update', 'prize', prize_id, performed_by=_actor(), new_value=update_data)
+
         # Broadcast to all clients
         prizes = Prize.get_all()
         RealtimeService.broadcast_prizes_updated(prizes)
-        
+
         return jsonify({
             'success': True,
             'prize': result,
@@ -404,6 +424,9 @@ def set_inventory(prize_id):
                 'error': 'This inventory was changed by someone else - reload and try again',
                 'current': current
             }), 409
+
+        log_audit('update', 'inventory', prize_id, performed_by=_actor(),
+                  new_value={'quantity': quantity, 'daily_limit': daily_limit})
 
         if daily_limit is not None:
             # Keep the default template in step so future dates populated
@@ -613,12 +636,11 @@ def create_special_event():
             if theme_config:
                 session.execute(text("""
                     UPDATE special_events
-                    SET theme_config = :theme_config, updated_at = :now
+                    SET theme_config = :theme_config, updated_at = CURRENT_TIMESTAMP
                     WHERE id = :event_id
                 """), {
                     'event_id': new_event_id,
                     'theme_config': json.dumps(theme_config),
-                    'now': datetime.now()
                 })
 
             for prize_id in prize_ids:
@@ -642,8 +664,10 @@ def create_special_event():
         # Get full event with prizes
         full_event = SpecialEvent.get_by_id(new_event_id)
 
+        log_audit('create', 'special_event', new_event_id, performed_by=_actor(),
+                  new_value={'name': name, 'event_type': event_type, 'prize_ids': prize_ids})
         logger.info(f"Admin created special event: {name} (ID: {new_event_id})")
-        
+
         return jsonify({
             'success': True,
             'event': full_event,
@@ -744,6 +768,8 @@ def update_special_event(event_id):
                 'error': 'This special event was changed by someone else - reload and try again'
             }), 409
 
+        log_audit('update', 'special_event', event_id, performed_by=_actor(), new_value=update_data)
+
         return jsonify({
             'success': True,
             'event': result,
@@ -767,8 +793,9 @@ def delete_special_event(event_id):
                 'error': 'Special event not found'
             }), 404
         
+        log_audit('delete', 'special_event', event_id, performed_by=_actor(), old_value={'name': result.get('name')})
         logger.info(f"Admin deleted special event: {result.get('name')} (ID: {event_id})")
-        
+
         return jsonify({
             'success': True,
             'message': f'Special event "{result.get("name")}" deleted successfully'
@@ -801,6 +828,7 @@ def toggle_special_event(event_id):
             }), 404
         
         status = 'activated' if is_active else 'deactivated'
+        log_audit('toggle', 'special_event', event_id, performed_by=_actor(), new_value={'is_active': is_active})
         logger.info(f"Admin {status} special event: {result.get('name')} (ID: {event_id})")
         
         return jsonify({
@@ -1052,9 +1080,11 @@ def create_template():
         
         # Get full template
         full_template = DailyPrizeTemplate.get_by_id(template['id'])
-        
+
+        log_audit('create', 'template', template['id'], performed_by=_actor(),
+                   new_value={'name': name, 'description': description, 'is_default': is_default})
         logger.info(f"Admin created template: {name} (ID: {template['id']})")
-        
+
         return jsonify({
             'success': True,
             'template': full_template,
@@ -1110,6 +1140,8 @@ def update_template(template_id):
                 'error': 'This template was changed by someone else - reload and try again'
             }), 409
 
+        log_audit('update', 'template', template_id, performed_by=_actor(), new_value=update_data)
+
         return jsonify({
             'success': True,
             'template': result,
@@ -1132,7 +1164,8 @@ def delete_template(template_id):
                 'success': False,
                 'error': 'Template not found or is the default template'
             }), 404
-        
+
+        log_audit('delete', 'template', template_id, performed_by=_actor(), old_value={'name': result.get('name')})
         logger.info(f"Admin deleted template: {result.get('name')} (ID: {template_id})")
         
         return jsonify({
@@ -1205,6 +1238,8 @@ def populate_template_with_all_prizes(template_id):
         insert_results = results[1:] if clear_existing else results
         added_count = sum(1 for r in insert_results if r)
 
+        log_audit('populate', 'template', template_id, performed_by=_actor(),
+                   new_value={'added_count': added_count, 'clear_existing': clear_existing})
         logger.info(f"Admin populated template {template_id} with {added_count} prizes")
         
         # Broadcast update to frontend
@@ -1613,6 +1648,8 @@ def create_guaranteed_win():
             }), 500
         
         win_type = "next spin" if scheduled_at is None else f"scheduled at {scheduled_at}"
+        log_audit('create', 'guaranteed_win', win['id'], performed_by=_actor(),
+                   new_value={'prize_id': prize_id, 'scheduled_at': scheduled_at_str, 'target_identifier': target_identifier})
         logger.info(f"Admin created guaranteed win: Prize {prize_id} - {win_type}")
         
         return jsonify({
@@ -1688,7 +1725,9 @@ def update_guaranteed_win(win_id):
                 'success': False,
                 'error': 'This guaranteed win was changed by someone else - reload and try again'
             }), 409
-        
+
+        log_audit('update', 'guaranteed_win', win_id, performed_by=_actor(), new_value=update_data)
+
         return jsonify({
             'success': True,
             'win': result,
@@ -1711,7 +1750,8 @@ def cancel_guaranteed_win(win_id):
                 'success': False,
                 'error': 'Guaranteed win not found or already processed'
             }), 404
-        
+
+        log_audit('cancel', 'guaranteed_win', win_id, performed_by=_actor())
         logger.info(f"Admin cancelled guaranteed win (ID: {win_id})")
         
         return jsonify({
@@ -1756,6 +1796,8 @@ def trigger_guaranteed_win_now(win_id):
                 'error': result.get('error') or 'Prize could not be awarded (out of stock or daily limit reached today)'
             }), 409
 
+        log_audit('trigger', 'guaranteed_win', win_id, performed_by=_actor(),
+                   new_value={'transaction_id': result['transaction_id'], 'triggered_by': triggered_by})
         logger.info(f"Admin manually triggered guaranteed win (ID: {win_id})")
 
         return jsonify({
@@ -1834,7 +1876,7 @@ def reset_daily_wins():
 
         # Get today's date
         today = date.today()
-        admin_user = request.headers.get('X-Admin-User', 'Admin')
+        admin_user = _actor()
 
         # Delete + reset + audit record land in one transaction, so a
         # failure partway through can't delete win history without also
