@@ -3,6 +3,7 @@ Special Event Model
 For festival/promotional prize activations with date-time criteria
 """
 
+import json
 import logging
 from datetime import datetime
 from ..database import execute_sql
@@ -159,6 +160,13 @@ class SpecialEvent:
         if not updates:
             return None
 
+        # psycopg2 doesn't auto-adapt a Python dict to JSONB - every other
+        # write path in this codebase (create_special_event's inline SQL,
+        # the now-removed update_theme_config()) explicitly json.dumps()
+        # first. Without this, passing theme_config here would fail to bind.
+        if 'theme_config' in updates and isinstance(updates['theme_config'], dict):
+            updates['theme_config'] = json.dumps(updates['theme_config'])
+
         set_clauses = [f"{k} = :{k}" for k in updates.keys()]
         updates['event_id'] = event_id
 
@@ -176,27 +184,7 @@ class SpecialEvent:
 
         results = execute_sql(sql, updates)
         return results[0] if results else None
-    
-    @staticmethod
-    def update_theme_config(event_id, theme_config):
-        """Update theme configuration for an event"""
-        import json
-        sql = """
-            UPDATE special_events
-            SET theme_config = :theme_config, updated_at = :now
-            WHERE id = :event_id
-            RETURNING id, name, theme_config
-        """
-        results = execute_sql(sql, {
-            'event_id': event_id,
-            'theme_config': json.dumps(theme_config) if isinstance(theme_config, dict) else theme_config,
-            'now': datetime.now()
-        })
-        
-        if results:
-            logger.info(f"Theme config updated for event {event_id}")
-        return results[0] if results else None
-    
+
     @staticmethod
     def delete(event_id):
         """Delete a special event (and all associated prize links)"""

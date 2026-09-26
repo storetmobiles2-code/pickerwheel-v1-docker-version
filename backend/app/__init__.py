@@ -48,19 +48,22 @@ def create_app(config_name=None):
     app.json = ISOJSONProvider(app)
 
     # Load configuration
-    from .config import config
+    from .config import config, validate_production_config
     config_name = config_name or os.environ.get('FLASK_ENV', 'development')
     app.config.from_object(config[config_name])
-    
+    validate_production_config(app, config_name)
+
+    allowed_origins = [o.strip() for o in app.config['ALLOWED_ORIGINS'].split(',') if o.strip()]
+
     # Enable CORS
     CORS(app, resources={
-        r"/api/*": {"origins": "*"},
-        r"/socket.io/*": {"origins": "*"}
+        r"/api/*": {"origins": allowed_origins},
+        r"/socket.io/*": {"origins": allowed_origins}
     })
-    
+
     # Initialize Socket.IO
-    socketio.init_app(app, 
-                      cors_allowed_origins="*",
+    socketio.init_app(app,
+                      cors_allowed_origins=allowed_origins,
                       async_mode='threading',
                       logger=True,
                       engineio_logger=True)

@@ -37,7 +37,14 @@ services:
       - ./assets:/app/assets
       - ./itemlist_dates_v2.txt:/app/itemlist_dates_v2.txt:ro
     environment:
-      - FLASK_ENV=production
+      # This is the local dev/docker-compose stack, not a real production
+      # deployment (that's the `production` branch's Procfile + a hosting
+      # platform's managed env vars instead). Mislabeling this as
+      # `production` would trip the fail-fast secrets check in
+      # backend/app/config.py's validate_production_config() the moment it
+      # ships, since this stack intentionally keeps simple, shared local
+      # dev credentials rather than rotated production secrets.
+      - FLASK_ENV=development
       - PORT=9080
       - DB_HOST=postgres
       - DB_PORT=5432

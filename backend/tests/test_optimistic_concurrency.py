@@ -1,6 +1,7 @@
 """
-Optimistic concurrency control on the 5 "edit a record" admin routes:
-prizes, inventory, special events, templates, guaranteed wins.
+Optimistic concurrency control on the "edit a record" admin routes:
+prizes, inventory, special events, templates, guaranteed wins, special-
+event theme config, and template-prize rows.
 
 This exists because the admin panel is moving to production usage from
 multiple devices at once. Before this, every update() blindly did
@@ -17,6 +18,12 @@ Failure path:
   - expected_updated_at is required - omitting it is rejected (400)
   - updating a record that doesn't exist at all is still a clean 404,
     not a false-positive 409
+
+Special-event theme config and template-prize rows were the last two
+resources without this check (found during a production-hardening
+review) - theme config used to go through a separate, unlocked
+SpecialEvent.update_theme_config() method instead of the properly-locked
+generic update(); template_prizes had no updated_at column at all.
 """
 from datetime import datetime, timedelta, timezone
 
@@ -215,3 +222,148 @@ def test_guaranteed_win_update_conflict_when_stale(client, admin_headers, make_p
 
     row = execute_sql('SELECT reason FROM guaranteed_wins WHERE id = :id', {'id': win['id']})[0]
     assert row['reason'] == 'first device reason'
+
+
+# ---- Special event theme config ----
+
+def test_theme_update_happy_path_with_correct_expected_updated_at(client, admin_headers):
+    now = datetime.now(timezone.utc)
+    create = client.post('/api/admin/special-events', json={
+        'name': 'Theme Concurrency Event',
+        'start_datetime': now.isoformat(),
+        'end_datetime': (now + timedelta(days=1)).isoformat(),
+    }, headers=admin_headers)
+    event = create.get_json()['event']
+
+    resp = client.put(f'/api/admin/special-events/{event["id"]}/theme', json={
+        'theme_config': {'primaryColor': '#ff00ff'},
+        'expected_updated_at': event['updated_at'],
+    }, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()['event']['theme_config'] == {'primaryColor': '#ff00ff'}
+
+
+def test_theme_update_conflict_when_stale(client, admin_headers):
+    now = datetime.now(timezone.utc)
+    create = client.post('/api/admin/special-events', json={
+        'name': 'Theme Concurrency Event 2',
+        'start_datetime': now.isoformat(),
+        'end_datetime': (now + timedelta(days=1)).isoformat(),
+    }, headers=admin_headers)
+    event = create.get_json()['event']
+    stale_value = event['updated_at']
+
+    client.put(f'/api/admin/special-events/{event["id"]}/theme', json={
+        'theme_config': {'primaryColor': '#111111'}, 'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+
+    resp = client.put(f'/api/admin/special-events/{event["id"]}/theme', json={
+        'theme_config': {'primaryColor': '#222222'}, 'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+    assert resp.status_code == 409
+
+    row = execute_sql('SELECT theme_config FROM special_events WHERE id = :id', {'id': event['id']})[0]
+    assert row['theme_config'] == {'primaryColor': '#111111'}
+
+
+def test_theme_update_requires_expected_updated_at(client, admin_headers):
+    now = datetime.now(timezone.utc)
+    create = client.post('/api/admin/special-events', json={
+        'name': 'Theme No Version Event',
+        'start_datetime': now.isoformat(),
+        'end_datetime': (now + timedelta(days=1)).isoformat(),
+    }, headers=admin_headers)
+    event = create.get_json()['event']
+
+    resp = client.put(f'/api/admin/special-events/{event["id"]}/theme', json={
+        'theme_config': {'primaryColor': '#333333'},
+    }, headers=admin_headers)
+    assert resp.status_code == 400
+
+
+# ---- Template prizes ----
+
+def _create_template_with_prize(client, admin_headers, prize_id):
+    template = client.post('/api/admin/templates', json={'name': 'Template Prize Concurrency'},
+                            headers=admin_headers).get_json()['template']
+    added = client.post(f'/api/admin/templates/{template["id"]}/prizes', json={
+        'prize_id': prize_id, 'quantity': 3, 'daily_limit': 2,
+    }, headers=admin_headers).get_json()['template_prize']
+    return template, added
+
+
+def test_template_prize_update_happy_path_with_correct_expected_updated_at(client, admin_headers, make_prize):
+    prize = make_prize()
+    template, tp = _create_template_with_prize(client, admin_headers, prize['id'])
+
+    resp = client.put(f'/api/admin/templates/{template["id"]}/prizes/{tp["id"]}', json={
+        'quantity': 9,
+        'expected_updated_at': tp['updated_at'],
+    }, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()['template_prize']['quantity'] == 9
+
+
+def test_template_prize_update_conflict_when_stale(client, admin_headers, make_prize):
+    prize = make_prize()
+    template, tp = _create_template_with_prize(client, admin_headers, prize['id'])
+    stale_value = tp['updated_at']
+
+    client.put(f'/api/admin/templates/{template["id"]}/prizes/{tp["id"]}', json={
+        'quantity': 5, 'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+
+    resp = client.put(f'/api/admin/templates/{template["id"]}/prizes/{tp["id"]}', json={
+        'quantity': 999, 'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+    assert resp.status_code == 409
+
+    row = execute_sql('SELECT quantity FROM template_prizes WHERE id = :id', {'id': tp['id']})[0]
+    assert row['quantity'] == 5
+
+
+def test_template_prize_update_requires_expected_updated_at(client, admin_headers, make_prize):
+    prize = make_prize()
+    template, tp = _create_template_with_prize(client, admin_headers, prize['id'])
+
+    resp = client.put(f'/api/admin/templates/{template["id"]}/prizes/{tp["id"]}', json={'quantity': 5},
+                       headers=admin_headers)
+    assert resp.status_code == 400
+
+
+def test_template_prize_add_as_edit_conflict_when_stale(client, admin_headers, make_prize):
+    """add_prize_to_template doubles as an edit (ON CONFLICT DO UPDATE) -
+    expected_updated_at is optional there (a brand-new add has nothing to
+    conflict with), but once supplied it must still be honored."""
+    prize = make_prize()
+    template, tp = _create_template_with_prize(client, admin_headers, prize['id'])
+    stale_value = tp['updated_at']
+
+    # Someone else edits it via the plain update route first
+    client.put(f'/api/admin/templates/{template["id"]}/prizes/{tp["id"]}', json={
+        'quantity': 5, 'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+
+    # This device retries the add-as-edit endpoint with its now-stale copy
+    resp = client.post(f'/api/admin/templates/{template["id"]}/prizes', json={
+        'prize_id': prize['id'], 'quantity': 999, 'daily_limit': 2,
+        'expected_updated_at': stale_value,
+    }, headers=admin_headers)
+    assert resp.status_code == 409
+
+    row = execute_sql('SELECT quantity FROM template_prizes WHERE id = :id', {'id': tp['id']})[0]
+    assert row['quantity'] == 5
+
+
+def test_template_prize_add_without_expected_updated_at_is_a_plain_upsert(client, admin_headers, make_prize):
+    """Adding a genuinely new prize to a template has nothing to conflict
+    with - expected_updated_at is optional and omitting it just works."""
+    prize = make_prize()
+    template = client.post('/api/admin/templates', json={'name': 'Fresh Add Template'},
+                            headers=admin_headers).get_json()['template']
+
+    resp = client.post(f'/api/admin/templates/{template["id"]}/prizes', json={
+        'prize_id': prize['id'], 'quantity': 4, 'daily_limit': 2,
+    }, headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()['template_prize']['quantity'] == 4

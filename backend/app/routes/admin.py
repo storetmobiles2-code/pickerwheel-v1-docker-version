@@ -897,6 +897,42 @@ def toggle_special_event(event_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _update_event_theme(event_id, theme_config, data):
+    """
+    Shared by update_event_theme/reset_event_theme - both are really just
+    a SpecialEvent.update() on the theme_config field, so they get the
+    same optimistic-concurrency check every other field-edit route already
+    has (this used to call a separate, unlocked SpecialEvent.update_theme_config()
+    instead, which also had the same naive-datetime bug already fixed
+    elsewhere in SpecialEvent.update()).
+    """
+    expected_updated_at_str = data.get('expected_updated_at')
+    if not expected_updated_at_str:
+        return None, (jsonify({
+            'success': False,
+            'error': 'expected_updated_at is required (send back the value from GET /special-events)'
+        }), 400)
+    try:
+        expected_updated_at = datetime.fromisoformat(expected_updated_at_str.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return None, (jsonify({
+            'success': False,
+            'error': 'Invalid expected_updated_at format'
+        }), 400)
+
+    result = SpecialEvent.update(event_id, expected_updated_at=expected_updated_at, theme_config=theme_config)
+
+    if not result:
+        if not SpecialEvent.get_by_id(event_id):
+            return None, (jsonify({'success': False, 'error': 'Special event not found'}), 404)
+        return None, (jsonify({
+            'success': False,
+            'error': 'This special event was changed by someone else - reload and try again'
+        }), 409)
+
+    return result, None
+
+
 @admin_bp.route('/special-events/<int:event_id>/theme', methods=['PUT'])
 @require_admin_auth
 def update_event_theme(event_id):
@@ -904,23 +940,20 @@ def update_event_theme(event_id):
     try:
         data = request.get_json() or {}
         theme_config = data.get('theme_config', {})
-        
+
         if not theme_config:
             return jsonify({
                 'success': False,
                 'error': 'theme_config is required'
             }), 400
-        
-        result = SpecialEvent.update_theme_config(event_id, theme_config)
-        
-        if not result:
-            return jsonify({
-                'success': False,
-                'error': 'Special event not found'
-            }), 404
-        
+
+        result, error_response = _update_event_theme(event_id, theme_config, data)
+        if error_response:
+            return error_response
+
+        log_audit('update', 'special_event', event_id, performed_by=_actor(), new_value={'theme_config': theme_config})
         logger.info(f"Admin updated theme for event: {result.get('name')} (ID: {event_id})")
-        
+
         return jsonify({
             'success': True,
             'event': result,
@@ -936,17 +969,15 @@ def update_event_theme(event_id):
 def reset_event_theme(event_id):
     """Reset theme configuration for a special event to empty (use default)"""
     try:
-        # Set theme_config to empty dict to reset to default
-        result = SpecialEvent.update_theme_config(event_id, {})
-        
-        if not result:
-            return jsonify({
-                'success': False,
-                'error': 'Special event not found'
-            }), 404
-        
+        data = request.get_json() or {}
+
+        result, error_response = _update_event_theme(event_id, {}, data)
+        if error_response:
+            return error_response
+
+        log_audit('reset_theme', 'special_event', event_id, performed_by=_actor())
         logger.info(f"Admin reset theme for event: {result.get('name')} (ID: {event_id})")
-        
+
         return jsonify({
             'success': True,
             'event': result,
@@ -1325,26 +1356,51 @@ def add_prize_to_template(template_id):
         quantity = data.get('quantity', 1)
         daily_limit = data.get('daily_limit')
         is_enabled = data.get('is_enabled', True)
-        
+
+        # Optional: omitted when adding a brand-new prize to the template
+        # (nothing to conflict with yet); required in spirit when editing
+        # one already there, though enforcing that would need to know in
+        # advance whether this call is an add or an edit - simplest to
+        # accept it as optional and let the DB-level WHERE guard do the
+        # real work when it's supplied.
+        expected_updated_at = None
+        expected_updated_at_str = data.get('expected_updated_at')
+        if expected_updated_at_str:
+            try:
+                expected_updated_at = datetime.fromisoformat(expected_updated_at_str.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid expected_updated_at format'
+                }), 400
+
         if not prize_id:
             return jsonify({
                 'success': False,
                 'error': 'prize_id is required'
             }), 400
-        
-        result = DailyPrizeTemplate.add_prize(template_id, prize_id, quantity, daily_limit, is_enabled)
-        
+
+        result = DailyPrizeTemplate.add_prize(
+            template_id, prize_id, quantity, daily_limit, is_enabled,
+            expected_updated_at=expected_updated_at
+        )
+
         if not result:
+            if expected_updated_at is not None:
+                return jsonify({
+                    'success': False,
+                    'error': 'This template prize was changed by someone else - reload and try again'
+                }), 409
             return jsonify({
                 'success': False,
                 'error': 'Failed to add prize to template'
             }), 500
-        
+
         # Broadcast update to frontend
         event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
         prizes = SpinService.get_wheel_prizes(event_id, date.today())
         RealtimeService.broadcast_prizes_updated(prizes)
-        
+
         return jsonify({
             'success': True,
             'template_prize': result,
@@ -1388,18 +1444,37 @@ def update_template_prize(template_id, template_prize_id):
     """Update a prize in a template"""
     try:
         data = request.get_json() or {}
-        
+
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
-        
-        result = DailyPrizeTemplate.update_prize(template_prize_id, **update_data)
-        
-        if not result:
+
+        expected_updated_at_str = update_data.pop('expected_updated_at', None)
+        if not expected_updated_at_str:
             return jsonify({
                 'success': False,
-                'error': 'Template prize not found'
-            }), 404
-        
+                'error': 'expected_updated_at is required (send back the value from GET /templates/:id)'
+            }), 400
+        try:
+            expected_updated_at = datetime.fromisoformat(expected_updated_at_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
+        result = DailyPrizeTemplate.update_prize(template_prize_id, expected_updated_at=expected_updated_at, **update_data)
+
+        if not result:
+            if not DailyPrizeTemplate.get_prize_by_id(template_prize_id):
+                return jsonify({
+                    'success': False,
+                    'error': 'Template prize not found'
+                }), 404
+            return jsonify({
+                'success': False,
+                'error': 'This template prize was changed by someone else - reload and try again'
+            }), 409
+
         # Broadcast update to frontend
         event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
         prizes = SpinService.get_wheel_prizes(event_id, date.today())
