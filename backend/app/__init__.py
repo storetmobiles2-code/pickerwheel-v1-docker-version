@@ -5,7 +5,9 @@ Flask app factory with Socket.IO for real-time updates
 
 import os
 import logging
+from datetime import datetime, date
 from flask import Flask
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
@@ -20,12 +22,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class ISOJSONProvider(DefaultJSONProvider):
+    """
+    Flask's DefaultJSONProvider serializes datetime/date as an RFC 1123
+    HTTP-date string ("Sat, 26 Sep 2026 10:37:21 GMT"), not ISO 8601.
+    Every admin update route that added an updated_at field for
+    optimistic-concurrency checking sends that value straight back to
+    the client to echo on its next request - and every place in this
+    codebase that parses a client-supplied datetime uses
+    datetime.fromisoformat(), which can't read Flask's own default
+    output. Without this, round-tripping updated_at would always 400.
+    """
+    @staticmethod
+    def default(o):
+        if isinstance(o, (datetime, date)):
+            return o.isoformat()
+        return DefaultJSONProvider.default(o)
+
+
 def create_app(config_name=None):
     """Create and configure the Flask application"""
-    app = Flask(__name__, 
+    app = Flask(__name__,
                 static_folder='../../frontend',
                 static_url_path='')
-    
+    app.json = ISOJSONProvider(app)
+
     # Load configuration
     from .config import config
     config_name = config_name or os.environ.get('FLASK_ENV', 'development')

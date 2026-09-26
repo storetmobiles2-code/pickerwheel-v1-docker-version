@@ -86,9 +86,13 @@ def test_delete_prize_soft_deletes(client, admin_headers, make_prize):
 
 
 def test_set_inventory_updates_quantity_and_daily_limit_together(client, admin_headers, make_prize):
+    from app.models import Inventory
     prize = make_prize(quantity=10, daily_limit=5)
-    resp = client.post(f'/api/admin/inventory/{prize["id"]}/set',
-                        json={'quantity': 3, 'daily_limit': 2}, headers=admin_headers)
+    current = Inventory.get_for_prize(prize['id'])
+    resp = client.post(f'/api/admin/inventory/{prize["id"]}/set', json={
+        'quantity': 3, 'daily_limit': 2,
+        'expected_updated_at': current['updated_at'].isoformat(),
+    }, headers=admin_headers)
     assert resp.status_code == 200
     row = execute_sql(
         'SELECT remaining_quantity, daily_limit FROM prize_inventory WHERE prize_id = :id',
@@ -121,9 +125,12 @@ def test_set_inventory_requires_at_least_one_field(client, admin_headers, make_p
 def test_set_inventory_on_prize_with_no_inventory_row_returns_404(client, admin_headers):
     # A prize row with no matching prize_inventory row for today
     from app.models import Prize
+    from datetime import datetime, timezone
     prize = Prize.create('No Inventory Prize', 3)
-    resp = client.post(f'/api/admin/inventory/{prize["id"]}/set',
-                        json={'quantity': 5}, headers=admin_headers)
+    resp = client.post(f'/api/admin/inventory/{prize["id"]}/set', json={
+        'quantity': 5,
+        'expected_updated_at': datetime.now(timezone.utc).isoformat(),
+    }, headers=admin_headers)
     assert resp.status_code == 404
 
 

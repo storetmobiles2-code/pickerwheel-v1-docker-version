@@ -222,7 +222,7 @@ def update_prize(prize_id):
     """Update prize details"""
     try:
         data = request.get_json() or {}
-        
+
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
 
@@ -232,13 +232,43 @@ def update_prize(prize_id):
                 'error': "budget_tier must be one of 'budget', 'mid_budget', 'high_end'"
             }), 400
 
-        result = Prize.update(prize_id, **update_data)
-        
-        if not result:
+        # Optimistic concurrency: required so a stale device can't
+        # silently overwrite a change made from another one since it last
+        # loaded this prize.
+        expected_updated_at_str = update_data.pop('expected_updated_at', None)
+        if not expected_updated_at_str:
             return jsonify({
                 'success': False,
-                'error': 'Prize not found or no valid fields to update'
-            }), 404
+                'error': 'expected_updated_at is required (send back the value from GET /prizes)'
+            }), 400
+        try:
+            expected_updated_at = datetime.fromisoformat(
+                expected_updated_at_str.replace('Z', '+00:00')
+            )
+        except (ValueError, AttributeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
+        if not update_data:
+            return jsonify({
+                'success': False,
+                'error': 'No valid fields to update'
+            }), 400
+
+        result = Prize.update(prize_id, expected_updated_at=expected_updated_at, **update_data)
+
+        if not result:
+            if not Prize.get_by_id(prize_id):
+                return jsonify({
+                    'success': False,
+                    'error': 'Prize not found'
+                }), 404
+            return jsonify({
+                'success': False,
+                'error': 'This prize was changed by someone else - reload and try again'
+            }), 409
         
         # Broadcast to all clients
         prizes = Prize.get_all()
@@ -325,6 +355,27 @@ def set_inventory(prize_id):
                     'error': 'daily_limit must be a non-negative integer'
                 }), 400
 
+        # Optimistic concurrency: the caller must send back the updated_at
+        # it last loaded (from GET /inventory). If someone else changed
+        # this row since then, the UPDATE below matches zero rows instead
+        # of silently overwriting their change - important now that the
+        # admin panel is used from multiple devices at once.
+        expected_updated_at_str = data.get('expected_updated_at')
+        if not expected_updated_at_str:
+            return jsonify({
+                'success': False,
+                'error': 'expected_updated_at is required (send back the value from GET /inventory)'
+            }), 400
+        try:
+            expected_updated_at = datetime.fromisoformat(
+                expected_updated_at_str.replace('Z', '+00:00')
+            )
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
         event_id = current_app.config.get('DEFAULT_EVENT_ID', 1)
 
         target_date_str = data.get('date')
@@ -338,13 +389,21 @@ def set_inventory(prize_id):
         # the row half-updated if the second write failed.
         result = Inventory.update_quantity(
             prize_id, event_id, target_date,
-            remaining_quantity=quantity, daily_limit=daily_limit
+            remaining_quantity=quantity, daily_limit=daily_limit,
+            expected_updated_at=expected_updated_at
         )
         if not result:
+            current = Inventory.get_for_prize(prize_id, event_id, target_date)
+            if not current:
+                return jsonify({
+                    'success': False,
+                    'error': 'Inventory not found'
+                }), 404
             return jsonify({
                 'success': False,
-                'error': 'Inventory not found'
-            }), 404
+                'error': 'This inventory was changed by someone else - reload and try again',
+                'current': current
+            }), 409
 
         if daily_limit is not None:
             # Keep the default template in step so future dates populated
@@ -650,15 +709,41 @@ def update_special_event(event_id):
         
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
-        
-        result = SpecialEvent.update(event_id, **update_data)
-        
-        if not result:
+
+        expected_updated_at_str = update_data.pop('expected_updated_at', None)
+        if not expected_updated_at_str:
             return jsonify({
                 'success': False,
-                'error': 'Special event not found or no valid fields to update'
-            }), 404
-        
+                'error': 'expected_updated_at is required (send back the value from GET /special-events)'
+            }), 400
+        try:
+            expected_updated_at = expected_updated_at_str if isinstance(expected_updated_at_str, datetime) \
+                else datetime.fromisoformat(expected_updated_at_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
+        if not update_data:
+            return jsonify({
+                'success': False,
+                'error': 'No valid fields to update'
+            }), 400
+
+        result = SpecialEvent.update(event_id, expected_updated_at=expected_updated_at, **update_data)
+
+        if not result:
+            if not SpecialEvent.get_by_id(event_id):
+                return jsonify({
+                    'success': False,
+                    'error': 'Special event not found'
+                }), 404
+            return jsonify({
+                'success': False,
+                'error': 'This special event was changed by someone else - reload and try again'
+            }), 409
+
         return jsonify({
             'success': True,
             'event': result,
@@ -989,15 +1074,42 @@ def update_template(template_id):
         
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
-        
-        result = DailyPrizeTemplate.update(template_id, **update_data)
-        
-        if not result:
+
+        expected_updated_at_str = update_data.pop('expected_updated_at', None)
+        if not expected_updated_at_str:
             return jsonify({
                 'success': False,
-                'error': 'Template not found or no valid fields to update'
-            }), 404
-        
+                'error': 'expected_updated_at is required (send back the value from GET /templates)'
+            }), 400
+        try:
+            expected_updated_at = datetime.fromisoformat(
+                expected_updated_at_str.replace('Z', '+00:00')
+            )
+        except (ValueError, AttributeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
+        if not update_data:
+            return jsonify({
+                'success': False,
+                'error': 'No valid fields to update'
+            }), 400
+
+        result = DailyPrizeTemplate.update(template_id, expected_updated_at=expected_updated_at, **update_data)
+
+        if not result:
+            if not DailyPrizeTemplate.get_by_id(template_id):
+                return jsonify({
+                    'success': False,
+                    'error': 'Template not found'
+                }), 404
+            return jsonify({
+                'success': False,
+                'error': 'This template was changed by someone else - reload and try again'
+            }), 409
+
         return jsonify({
             'success': True,
             'template': result,
@@ -1520,25 +1632,62 @@ def update_guaranteed_win(win_id):
     try:
         data = request.get_json() or {}
         
-        # Handle scheduled_at parsing
+        # Handle scheduled_at parsing - reject invalid values instead of
+        # silently passing the raw string through to the database
         if 'scheduled_at' in data and data['scheduled_at']:
             try:
                 data['scheduled_at'] = datetime.fromisoformat(
                     data['scheduled_at'].replace('Z', '+00:00')
                 )
-            except ValueError:
-                pass
-        
+            except (ValueError, AttributeError):
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid scheduled_at format'
+                }), 400
+
         # Remove admin_password from update data
         update_data = {k: v for k, v in data.items() if k != 'admin_password'}
-        
-        result = GuaranteedWin.update(win_id, **update_data)
-        
-        if not result:
+
+        expected_updated_at_str = update_data.pop('expected_updated_at', None)
+        if not expected_updated_at_str:
             return jsonify({
                 'success': False,
-                'error': 'Guaranteed win not found or not in pending status'
-            }), 404
+                'error': 'expected_updated_at is required (send back the value from GET /guaranteed-wins)'
+            }), 400
+        try:
+            expected_updated_at = datetime.fromisoformat(
+                expected_updated_at_str.replace('Z', '+00:00')
+            )
+        except (ValueError, AttributeError):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid expected_updated_at format'
+            }), 400
+
+        if not update_data:
+            return jsonify({
+                'success': False,
+                'error': 'No valid fields to update'
+            }), 400
+
+        result = GuaranteedWin.update(win_id, expected_updated_at=expected_updated_at, **update_data)
+
+        if not result:
+            existing = GuaranteedWin.get_by_id(win_id)
+            if not existing:
+                return jsonify({
+                    'success': False,
+                    'error': 'Guaranteed win not found'
+                }), 404
+            if existing['status'] != 'pending':
+                return jsonify({
+                    'success': False,
+                    'error': 'Guaranteed win is no longer pending'
+                }), 404
+            return jsonify({
+                'success': False,
+                'error': 'This guaranteed win was changed by someone else - reload and try again'
+            }), 409
         
         return jsonify({
             'success': True,

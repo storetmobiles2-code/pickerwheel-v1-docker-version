@@ -23,6 +23,7 @@ class Inventory:
         sql = """
             SELECT pi.id, pi.prize_id, pi.event_id, pi.available_date,
                    pi.initial_quantity, pi.remaining_quantity, pi.daily_limit,
+                   pi.updated_at,
                    p.name as prize_name, pc.name as category_name
             FROM prize_inventory pi
             JOIN prizes p ON pi.prize_id = p.id
@@ -47,8 +48,9 @@ class Inventory:
         sql = """
             SELECT pi.id, pi.prize_id, pi.event_id, pi.available_date,
                    pi.initial_quantity, pi.remaining_quantity, pi.daily_limit,
+                   pi.updated_at,
                    p.name as prize_name, p.emoji, p.is_enabled, p.is_active,
-                   p.budget_tier,
+                   p.budget_tier, p.updated_at as prize_updated_at,
                    pc.name as category_name, pc.display_name as category_display,
                    COALESCE(tw.wins_today, 0) as wins_today
             FROM prize_inventory pi
@@ -112,30 +114,46 @@ class Inventory:
         return results
     
     @staticmethod
-    def update_quantity(prize_id, event_id=1, target_date=None, 
-                        remaining_quantity=None, daily_limit=None):
-        """Update inventory quantity"""
+    def update_quantity(prize_id, event_id=1, target_date=None,
+                        remaining_quantity=None, daily_limit=None,
+                        expected_updated_at=None):
+        """
+        Update inventory quantity.
+
+        expected_updated_at: when given, the update only applies if the
+        row's updated_at still matches - the optimistic-concurrency check
+        that lets a caller detect "someone else changed this since you
+        loaded it" instead of silently overwriting their change. Returns
+        None either way (no row); the caller (see admin.py's set_inventory)
+        distinguishes "no such row" from "row exists but was modified" by
+        re-checking existence.
+        """
         if target_date is None:
             target_date = date.today()
-        
+
         updates = []
         params = {'prize_id': prize_id, 'event_id': event_id, 'date': target_date}
-        
+
         if remaining_quantity is not None:
             updates.append("remaining_quantity = :qty")
             params['qty'] = remaining_quantity
-        
+
         if daily_limit is not None:
             updates.append("daily_limit = :limit")
             params['limit'] = daily_limit
-        
+
         if not updates:
             return None
-        
+
+        where_clause = "WHERE prize_id = :prize_id AND event_id = :event_id AND available_date = :date"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            params['expected_updated_at'] = expected_updated_at
+
         sql = f"""
-            UPDATE prize_inventory 
+            UPDATE prize_inventory
             SET {', '.join(updates)}, updated_at = CURRENT_TIMESTAMP
-            WHERE prize_id = :prize_id AND event_id = :event_id AND available_date = :date
+            {where_clause}
             RETURNING *
         """
         results = execute_sql(sql, params)

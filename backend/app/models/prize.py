@@ -42,7 +42,7 @@ class Prize:
             SELECT p.id, p.name, p.category_id, pc.name as category_name,
                    pc.display_name as category_display, p.type, p.emoji,
                    p.description, p.is_active, p.is_enabled, p.display_order,
-                   p.budget_tier, pc.color, pc.text_color
+                   p.budget_tier, pc.color, pc.text_color, p.updated_at
             FROM prizes p
             JOIN prize_categories pc ON p.category_id = pc.id
         """
@@ -59,7 +59,7 @@ class Prize:
             SELECT p.id, p.name, p.category_id, pc.name as category_name,
                    pc.display_name as category_display, p.type, p.emoji,
                    p.description, p.is_active, p.is_enabled, p.display_order,
-                   p.budget_tier, pc.color, pc.text_color
+                   p.budget_tier, pc.color, pc.text_color, p.updated_at
             FROM prizes p
             JOIN prize_categories pc ON p.category_id = pc.id
             WHERE p.id = :id
@@ -91,7 +91,7 @@ class Prize:
         sql = """
             INSERT INTO prizes (name, category_id, emoji, description, display_order, budget_tier, is_active, is_enabled)
             VALUES (:name, :category_id, :emoji, :description, :display_order, :budget_tier, TRUE, TRUE)
-            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier
+            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier, updated_at
         """
         results = execute_sql(sql, {
             'name': name,
@@ -118,23 +118,35 @@ class Prize:
         return None
     
     @staticmethod
-    def update(prize_id, **kwargs):
-        """Update a prize"""
+    def update(prize_id, expected_updated_at=None, **kwargs):
+        """
+        Update a prize.
+
+        expected_updated_at: optimistic-concurrency check - when given,
+        the update only applies if the row's updated_at still matches
+        (see admin.py's update_prize route for how a mismatch is
+        reported back as a 409 rather than a silent overwrite).
+        """
         allowed_fields = ['name', 'category_id', 'emoji', 'description', 'display_order', 'is_enabled', 'budget_tier']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
-        
+
         if not updates:
             return None
-        
+
         set_clause = ', '.join([f"{k} = :{k}" for k in updates.keys()])
         updates['id'] = prize_id
-        
+
+        where_clause = "WHERE id = :id"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            updates['expected_updated_at'] = expected_updated_at
+
         sql = f"""
             UPDATE prizes SET {set_clause}, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id
-            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier
+            {where_clause}
+            RETURNING id, name, category_id, emoji, description, is_active, is_enabled, display_order, budget_tier, updated_at
         """
-        
+
         results = execute_sql(sql, updates)
         if results:
             logger.info(f"Updated prize {prize_id}: {updates}")

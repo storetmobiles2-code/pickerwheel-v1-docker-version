@@ -39,8 +39,8 @@ class SpecialEvent:
         """Get special event by ID with associated prizes"""
         sql = """
             SELECT se.id, se.name, se.description, se.event_type,
-                   se.start_datetime, se.end_datetime, se.is_active, 
-                   se.theme_config, se.created_at
+                   se.start_datetime, se.end_datetime, se.is_active,
+                   se.theme_config, se.created_at, se.updated_at
             FROM special_events se
             WHERE se.id = :event_id
         """
@@ -57,8 +57,8 @@ class SpecialEvent:
         """Get all special events"""
         sql = """
             SELECT se.id, se.name, se.description, se.event_type,
-                   se.start_datetime, se.end_datetime, se.is_active, 
-                   se.theme_config, se.created_at
+                   se.start_datetime, se.end_datetime, se.is_active,
+                   se.theme_config, se.created_at, se.updated_at
             FROM special_events se
         """
         
@@ -144,27 +144,36 @@ class SpecialEvent:
         return results[0] if results else None
     
     @staticmethod
-    def update(event_id, **kwargs):
-        """Update a special event"""
-        allowed_fields = ['name', 'description', 'event_type', 'start_datetime', 
+    def update(event_id, expected_updated_at=None, **kwargs):
+        """
+        Update a special event.
+
+        expected_updated_at: optimistic-concurrency check - when given,
+        the update only applies if the row's updated_at still matches.
+        """
+        allowed_fields = ['name', 'description', 'event_type', 'start_datetime',
                           'end_datetime', 'is_active', 'theme_config']
-        
+
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields and v is not None}
-        
+
         if not updates:
             return None
-        
+
         set_clauses = [f"{k} = :{k}" for k in updates.keys()]
         updates['event_id'] = event_id
-        updates['now'] = datetime.now()
-        
+
+        where_clause = "WHERE id = :event_id"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            updates['expected_updated_at'] = expected_updated_at
+
         sql = f"""
             UPDATE special_events
-            SET {', '.join(set_clauses)}, updated_at = :now
-            WHERE id = :event_id
-            RETURNING id, name, description, event_type, start_datetime, end_datetime, is_active, theme_config
+            SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
+            {where_clause}
+            RETURNING id, name, description, event_type, start_datetime, end_datetime, is_active, theme_config, updated_at
         """
-        
+
         results = execute_sql(sql, updates)
         return results[0] if results else None
     

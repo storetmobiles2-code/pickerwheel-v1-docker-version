@@ -1620,6 +1620,28 @@
             return response.json();
         }
 
+        // Same as apiPost/apiPut but also surfaces the HTTP status, so a
+        // caller can tell a 409 (someone else changed this first) apart
+        // from an ordinary validation failure and react differently -
+        // reload instead of just showing an error toast.
+        async function apiPostWithStatus(endpoint, data = {}) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Password': authPassword },
+                body: JSON.stringify({ ...data, admin_password: authPassword })
+            });
+            return { data: await response.json(), status: response.status };
+        }
+
+        async function apiPutWithStatus(endpoint, data = {}) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Password': authPassword },
+                body: JSON.stringify({ ...data, admin_password: authPassword })
+            });
+            return { data: await response.json(), status: response.status };
+        }
+
         async function apiDelete(endpoint) {
             const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'DELETE',
@@ -1662,7 +1684,14 @@
                         remaining_quantity: item.remaining_quantity,
                         initial_quantity: item.initial_quantity,
                         daily_limit: item.daily_limit,
-                        wins_today: item.wins_today || 0
+                        wins_today: item.wins_today || 0,
+                        // Optimistic-concurrency tokens: sent back on the
+                        // next edit so the server can tell whether someone
+                        // else changed this row first (see PUT /prizes/:id
+                        // and POST /inventory/:id/set, both of which now
+                        // require expected_updated_at).
+                        updated_at: item.updated_at,
+                        prize_updated_at: item.prize_updated_at
                     }));
                     renderPrizesTable(prizesData);
                     updateStats(data);
@@ -1778,17 +1807,33 @@
             }
         }
 
+        // Shown when a save is rejected because someone else changed the
+        // same record first (409) - the admin panel can now be open on
+        // several devices at once, so this is a real, expected case, not
+        // just theoretical. Discards this device's in-progress edit and
+        // reloads rather than attempting a merge.
+        function handleConflict(data, status, reload = loadPrizes) {
+            if (status === 409) {
+                showToast(data.error || 'This was changed on another device - reloaded with the latest', 'error');
+                reload();
+                return true;
+            }
+            return false;
+        }
+
         async function adjustQuantity(prizeId, adjustment) {
             try {
                 const prize = prizesData.find(p => p.id === prizeId);
                 const currentQty = prize?.remaining_quantity || 0;
                 const newQty = Math.max(0, currentQty + adjustment);
-                
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { quantity: newQty });
+
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    quantity: newQty, expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast(`Quantity ${adjustment > 0 ? 'increased' : 'decreased'}`, 'success');
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to adjust quantity', 'error');
                 }
             } catch (error) {
@@ -1798,11 +1843,14 @@
 
         async function setQuantity(prizeId, quantity) {
             try {
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { quantity: parseInt(quantity) });
+                const prize = prizesData.find(p => p.id === prizeId);
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    quantity: parseInt(quantity), expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast('Quantity updated', 'success');
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to set quantity', 'error');
                 }
             } catch (error) {
@@ -1845,7 +1893,10 @@
             }
             
             try {
-                const data = await apiPut(`/admin/prizes/${editingPrizeId}`, { name: newName });
+                const prize = prizesData.find(p => p.id === editingPrizeId);
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${editingPrizeId}`, {
+                    name: newName, expected_updated_at: prize?.prize_updated_at
+                });
                 if (data.success) {
                     showToast('Prize name updated', 'success');
                     closeModal('editPrizeNameModal');
@@ -1854,28 +1905,32 @@
                     if (currentTemplateId) {
                         loadTemplateDetails();
                     }
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update name', 'error');
                 }
             } catch (error) {
                 showToast('Error updating name', 'error');
             }
         }
-        
+
         // Update Daily Limit (updates the default template's daily limit for this prize)
         async function updateDailyLimit(prizeId, limit) {
             const dailyLimit = parseInt(limit, 10);
-            if (Number.isNaN(dailyLimit) || dailyLimit < 1) {
-                showToast('Daily limit must be a whole number of at least 1', 'error');
+            if (Number.isNaN(dailyLimit) || dailyLimit < 0) {
+                showToast('Daily limit must be a whole number of at least 0', 'error');
                 loadPrizes(); // Restore the saved value
                 return;
             }
             try {
+                const prize = prizesData.find(p => p.id === prizeId);
                 // Saves today's limit (what spins enforce) and syncs the default template
-                const data = await apiPost(`/admin/inventory/${prizeId}/set`, { daily_limit: dailyLimit });
+                const { data, status } = await apiPostWithStatus(`/admin/inventory/${prizeId}/set`, {
+                    daily_limit: dailyLimit, expected_updated_at: prize?.updated_at
+                });
                 if (data.success) {
                     showToast('Daily limit updated', 'success');
-                } else {
+                    loadPrizes();
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update daily limit', 'error');
                     loadPrizes(); // Refresh to show original value
                 }
@@ -1888,13 +1943,15 @@
         // Update Budget Tier (admin-panel price grouping only - no effect on rarity/win odds)
         async function updatePrizeTier(prizeId, tier) {
             try {
-                const data = await apiPut(`/admin/prizes/${prizeId}`, { budget_tier: tier });
+                const prize = prizesData.find(p => p.id === prizeId);
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${prizeId}`, {
+                    budget_tier: tier, expected_updated_at: prize?.prize_updated_at
+                });
                 if (data.success) {
-                    const prize = prizesData.find(p => p.id === prizeId);
                     if (prize) prize.budget_tier = tier;
                     showToast('Budget tier updated', 'success');
-                    renderPrizesTable();
-                } else {
+                    loadPrizes();
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update budget tier', 'error');
                     loadPrizes();
                 }
@@ -2414,6 +2471,7 @@
         // =====================================================
         
         let currentTemplateId = null;
+        let currentTemplateUpdatedAt = null; // for optimistic-concurrency checks on PUT /templates/:id
         let templatesData = [];
         
         async function loadTemplates(autoSelectDefault = false) {
@@ -2479,6 +2537,7 @@
                 const data = await apiGet(`/admin/templates/${templateId}`);
                 if (data.success && data.template) {
                     const template = data.template;
+                    currentTemplateUpdatedAt = template.updated_at;
                     document.getElementById('templateName').textContent = template.name;
                     document.getElementById('templateDescription').textContent = template.description || '';
                     const defaultBadge = document.getElementById('templateDefault');
@@ -2562,13 +2621,16 @@
         
         async function setTemplateAsDefault() {
             if (!currentTemplateId) return;
-            
+
             try {
-                const data = await apiPut(`/admin/templates/${currentTemplateId}`, { is_default: true });
+                const { data, status } = await apiPutWithStatus(`/admin/templates/${currentTemplateId}`, {
+                    is_default: true, expected_updated_at: currentTemplateUpdatedAt
+                });
                 if (data.success) {
                     showToast('Template set as default', 'success');
                     loadTemplates();
-                } else {
+                    loadTemplateDetails();
+                } else if (!handleConflict(data, status, loadTemplateDetails)) {
                     showToast(data.error || 'Failed to update template', 'error');
                 }
             } catch (error) {
@@ -2662,7 +2724,12 @@
             }
             
             try {
-                const data = await apiPut(`/admin/prizes/${prizeId}`, { name: newName });
+                // prizesData is loaded at login and is the only place this
+                // page currently tracks a prize's own updated_at
+                const cachedPrize = prizesData.find(p => p.id === parseInt(prizeId, 10));
+                const { data, status } = await apiPutWithStatus(`/admin/prizes/${prizeId}`, {
+                    name: newName, expected_updated_at: cachedPrize?.prize_updated_at
+                });
                 if (data.success) {
                     showToast('Prize name updated', 'success');
                     closeModal('editTemplatePrizeModal');
@@ -2671,9 +2738,9 @@
                     if (nameSpan) nameSpan.textContent = newName;
                     // Also refresh template details for consistency
                     loadTemplateDetails();
-                    // Refresh prizes tab data too
+                    // Refresh prizes tab data too (also picks up the new updated_at)
                     loadPrizes();
-                } else {
+                } else if (!handleConflict(data, status)) {
                     showToast(data.error || 'Failed to update prize name', 'error');
                 }
             } catch (error) {

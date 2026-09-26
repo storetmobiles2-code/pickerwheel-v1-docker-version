@@ -6,7 +6,7 @@ Real-time event handlers for Socket.IO
 import logging
 from flask import current_app
 from flask_socketio import emit, join_room, leave_room
-from ..services.realtime_service import set_socketio
+from ..services.realtime_service import set_socketio, _json_safe
 from ..models import Prize
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ def register_handlers(socketio):
         """Handle request for current prize list"""
         try:
             prizes = Prize.get_all()
-            emit('prizes:updated', {'prizes': prizes})
+            emit('prizes:updated', _json_safe({'prizes': prizes}))
         except Exception as e:
             logger.error(f"Error getting prizes: {e}")
             emit('error', {'message': 'Failed to get prizes'})
@@ -104,8 +104,8 @@ def register_handlers(socketio):
                 # Get updated prize list
                 prizes = Prize.get_all()
                 # Broadcast to ALL clients
-                socketio.emit('prizes:updated', {'prizes': prizes})
-                socketio.emit('prize:added', {'prize': prize})
+                socketio.emit('prizes:updated', _json_safe({'prizes': prizes}))
+                socketio.emit('prize:added', _json_safe({'prize': prize}))
                 emit('admin:success', {'message': f'Prize "{name}" added successfully'})
                 logger.info(f"Admin added prize via WebSocket: {name}")
             else:
@@ -133,8 +133,8 @@ def register_handlers(socketio):
                 # Get updated prize list
                 prizes = Prize.get_all()
                 # Broadcast to ALL clients
-                socketio.emit('prizes:updated', {'prizes': prizes})
-                socketio.emit('prize:removed', {'prize_id': prize_id, 'prize_name': result.get('name')})
+                socketio.emit('prizes:updated', _json_safe({'prizes': prizes}))
+                socketio.emit('prize:removed', _json_safe({'prize_id': prize_id, 'prize_name': result.get('name')}))
                 emit('admin:success', {'message': f'Prize removed successfully'})
                 logger.info(f"Admin removed prize via WebSocket: {prize_id}")
             else:
@@ -163,12 +163,12 @@ def register_handlers(socketio):
                 # Get updated prize list
                 prizes = Prize.get_all()
                 # Broadcast to ALL clients
-                socketio.emit('prizes:updated', {'prizes': prizes})
-                socketio.emit('prize:enabled_changed', {
+                socketio.emit('prizes:updated', _json_safe({'prizes': prizes}))
+                socketio.emit('prize:enabled_changed', _json_safe({
                     'prize_id': prize_id,
                     'is_enabled': is_enabled,
                     'prize_name': result.get('name')
-                })
+                }))
                 status = 'enabled' if is_enabled else 'disabled'
                 emit('admin:success', {'message': f'Prize {status} successfully'})
                 logger.info(f"Admin toggled prize via WebSocket: {prize_id} -> {is_enabled}")
