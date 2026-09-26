@@ -149,6 +149,44 @@ def test_prize_disabled_after_scheduling_leaves_guaranteed_win_pending(client, a
     assert remaining == 5  # untouched
 
 
+def test_spin_with_mismatched_prize_id_and_guaranteed_win_is_rejected(client, admin_headers, make_prize):
+    """Regression test for a real bug found in a production-hardening
+    review: consume_prize() validated a submitted guaranteed_win_id's
+    status/max_triggers/expiry, and separately validated the submitted
+    prize_id's is_enabled/stock/daily_limit, but never checked that the
+    two actually referred to the SAME prize. A tampered /api/spin request
+    could submit prize B's id alongside a real, pending guaranteed win
+    for prize A, consuming prize B's inventory while marking the
+    unrelated win triggered."""
+    prize_a = make_prize(quantity=5, daily_limit=5, name='Guaranteed Win Target')
+    prize_b = make_prize(quantity=5, daily_limit=5, name='Unrelated Prize')
+    win_id = _create_guaranteed_win(client, admin_headers, prize_a['id']).get_json()['win']['id']
+
+    spin = client.post('/api/spin', json={
+        'user_id': 'tamper-user', 'prize_id': prize_b['id'], 'guaranteed_win_id': win_id
+    })
+    assert spin.status_code == 400
+    assert spin.get_json()['success'] is False
+
+    win_row = execute_sql(
+        'SELECT status, triggered_count FROM guaranteed_wins WHERE id = :id', {'id': win_id}
+    )[0]
+    assert win_row['status'] == 'pending'
+    assert win_row['triggered_count'] == 0
+
+    for prize in (prize_a, prize_b):
+        remaining = execute_sql(
+            'SELECT remaining_quantity FROM prize_inventory WHERE prize_id = :id', {'id': prize['id']}
+        )[0]['remaining_quantity']
+        assert remaining == 5  # neither prize's inventory was touched
+
+    tx_count = execute_sql(
+        "SELECT COUNT(*) AS n FROM transactions WHERE prize_id IN (:a, :b)",
+        {'a': prize_a['id'], 'b': prize_b['id']}
+    )[0]['n']
+    assert tx_count == 0
+
+
 def test_replaying_a_triggered_guaranteed_win_is_rejected(client, admin_headers, make_prize):
     prize = make_prize(quantity=5, daily_limit=5)
     win_id = _create_guaranteed_win(client, admin_headers, prize['id']).get_json()['win']['id']

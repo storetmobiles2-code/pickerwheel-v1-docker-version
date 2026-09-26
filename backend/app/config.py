@@ -30,15 +30,54 @@ class Config:
     
     # Admin settings
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'myTAdmin2025')
-    
+
+    # CORS - comma-separated list of allowed origins. Defaults cover the app's
+    # own same-origin dev serving (Flask serves admin.html/index.html itself,
+    # so CORS barely matters for the primary UI - this only gates OTHER
+    # origins calling the API/WebSocket directly).
+    ALLOWED_ORIGINS = os.environ.get(
+        'ALLOWED_ORIGINS', 'http://localhost:9080,http://127.0.0.1:9080'
+    )
+
     # Event settings
     DEFAULT_EVENT_ID = 1
-    
+
     # Socket.IO settings
     SOCKETIO_MESSAGE_QUEUE = os.environ.get('SOCKETIO_MESSAGE_QUEUE', None)
-    
+
     # Feature flags
     REALTIME_WHEEL_UPDATES = os.environ.get('REALTIME_WHEEL_UPDATES', 'true').lower() == 'true'
+
+
+# Known-insecure default literals that must never be used once FLASK_ENV=production -
+# both are committed in docker-compose.yml/this file for local dev convenience, so
+# they're effectively public and would otherwise be silently accepted in production.
+_INSECURE_SECRET_KEY_DEFAULT = 'pickerwheel-secret-key-change-in-production'
+_INSECURE_ADMIN_PASSWORD_DEFAULT = 'myTAdmin2025'
+
+
+def validate_production_config(app, config_name):
+    """
+    Fail fast at startup if running with FLASK_ENV=production but still
+    carrying a known-insecure default secret. Deliberately does nothing for
+    development/testing - both configs are expected to use these exact
+    bootstrap values (see TestingConfig / docker-compose.yml), so gating
+    this to production only is what keeps local dev and the test suite
+    working unchanged.
+    """
+    if config_name != 'production':
+        return
+
+    if app.config.get('SECRET_KEY') == _INSECURE_SECRET_KEY_DEFAULT:
+        raise RuntimeError(
+            'SECRET_KEY is unset or still the insecure default. '
+            'Set a long random SECRET_KEY before running with FLASK_ENV=production.'
+        )
+    if app.config.get('ADMIN_PASSWORD') == _INSECURE_ADMIN_PASSWORD_DEFAULT:
+        raise RuntimeError(
+            'ADMIN_PASSWORD is unset or still the insecure default. '
+            'Set a real ADMIN_PASSWORD before running with FLASK_ENV=production.'
+        )
 
 
 class DevelopmentConfig(Config):

@@ -159,44 +159,78 @@ class DailyPrizeTemplate:
         return count
     
     @staticmethod
-    def add_prize(template_id, prize_id, quantity=1, daily_limit=None, is_enabled=True):
-        """Add a prize to a template"""
-        sql = """
-            INSERT INTO template_prizes (template_id, prize_id, quantity, daily_limit, is_enabled)
-            VALUES (:template_id, :prize_id, :quantity, :daily_limit, :is_enabled)
-            ON CONFLICT (template_id, prize_id) 
-            DO UPDATE SET quantity = :quantity, daily_limit = :daily_limit, is_enabled = :is_enabled
-            RETURNING id, template_id, prize_id, quantity, daily_limit, is_enabled
+    def add_prize(template_id, prize_id, quantity=1, daily_limit=None, is_enabled=True, expected_updated_at=None):
         """
-        results = execute_sql(sql, {
+        Add a prize to a template, or edit it if it's already there
+        (ON CONFLICT DO UPDATE).
+
+        expected_updated_at: optional, since a brand-new add has no prior
+        updated_at to send back - the INSERT branch is always safe. When
+        editing an existing row the caller sends the updated_at it last
+        saw, and the DO UPDATE only applies if it still matches - same
+        optimistic-concurrency pattern as every other resource, just
+        conditional here because this one route serves both add and edit.
+        """
+        params = {
             'template_id': template_id,
             'prize_id': prize_id,
             'quantity': quantity,
             'daily_limit': daily_limit,
             'is_enabled': is_enabled
-        })
+        }
+
+        do_update = "quantity = :quantity, daily_limit = :daily_limit, is_enabled = :is_enabled, updated_at = CURRENT_TIMESTAMP"
+        if expected_updated_at is not None:
+            do_update += " WHERE template_prizes.updated_at = :expected_updated_at"
+            params['expected_updated_at'] = expected_updated_at
+
+        sql = f"""
+            INSERT INTO template_prizes (template_id, prize_id, quantity, daily_limit, is_enabled)
+            VALUES (:template_id, :prize_id, :quantity, :daily_limit, :is_enabled)
+            ON CONFLICT (template_id, prize_id)
+            DO UPDATE SET {do_update}
+            RETURNING id, template_id, prize_id, quantity, daily_limit, is_enabled, updated_at
+        """
+        results = execute_sql(sql, params)
         return results[0] if results else None
-    
+
     @staticmethod
-    def update_prize(template_prize_id, **kwargs):
-        """Update a prize in a template"""
+    def update_prize(template_prize_id, expected_updated_at=None, **kwargs):
+        """
+        Update a prize in a template.
+
+        expected_updated_at: optimistic-concurrency check - when given,
+        the update only applies if the row's updated_at still matches.
+        """
         allowed_fields = ['quantity', 'daily_limit', 'is_enabled']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
-        
+
         if not updates:
             return None
-        
+
         set_clauses = [f"{k} = :{k}" for k in updates.keys()]
         updates['id'] = template_prize_id
-        
+
+        where_clause = "WHERE id = :id"
+        if expected_updated_at is not None:
+            where_clause += " AND updated_at = :expected_updated_at"
+            updates['expected_updated_at'] = expected_updated_at
+
         sql = f"""
             UPDATE template_prizes
-            SET {', '.join(set_clauses)}
-            WHERE id = :id
-            RETURNING id, template_id, prize_id, quantity, daily_limit, is_enabled
+            SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
+            {where_clause}
+            RETURNING id, template_id, prize_id, quantity, daily_limit, is_enabled, updated_at
         """
-        
+
         results = execute_sql(sql, updates)
+        return results[0] if results else None
+
+    @staticmethod
+    def get_prize_by_id(template_prize_id):
+        """Get a single template-prize row by its id (existence check for 404-vs-409 disambiguation)"""
+        sql = "SELECT id, template_id, prize_id, quantity, daily_limit, is_enabled, updated_at FROM template_prizes WHERE id = :id"
+        results = execute_sql(sql, {'id': template_prize_id})
         return results[0] if results else None
     
     @staticmethod
