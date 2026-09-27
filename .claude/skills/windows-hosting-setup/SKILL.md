@@ -134,15 +134,25 @@ Cloudflare dashboard first if one still points at a dead tunnel.
 
 ### 4. Install cloudflared as a Windows service (survives reboot/network changes/sleep)
 
+Run `cloudflared service install` from an elevated PowerShell. **This alone does
+not work for a locally-managed tunnel.** It registers the exe with no arguments,
+so the service shows "Running" but never connects (the public URL then gives
+Error 1033 after login). It also rewrites
+`C:\Program Files (x86)\cloudflared\config.yml` to a stub on every start, so
+editing that file has no effect. After installing the service, run the elevated
+repair script in `.claude/agents/cloudflare-tunnel-doctor.md` with the tunnel ID.
+It copies the config and credentials to
+`C:\Windows\System32\config\systemprofile\.cloudflared\` and sets the service
+command to `--config <that config.yml> tunnel run`. Once that's done, the service
+starts on boot and reconnects on its own after WiFi drops (usually within about
+a minute).
+
+Confirm it's actually connected. `Get-Service` showing "Running" is not enough,
+and neither is a 302 from the public URL, because Cloudflare Access returns that
+302 even when the tunnel is down:
 ```powershell
-cloudflared service install
-```
-This reads the `config.yml` from step 3 and registers `cloudflared` as a
-Windows service that starts automatically on boot and reconnects on its own
-after any network interruption - no manual restart needed when the WiFi
-changes, sleeps, or the laptop reboots. Confirm it's running:
-```powershell
-Get-Service cloudflared
+curl.exe -s http://127.0.0.1:20241/ready          # readyConnections must be > 0
+cloudflared tunnel info pickerwheel-admin         # must list a connector
 ```
 
 ### 5. Start the app
@@ -180,11 +190,13 @@ $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
 Write-Host "Customer wheel (this network): http://$($ip):9080"
 ```
 
-Nothing needs reconfiguring for this - it's just a fresh URL to hand out
-(write on a sign, put in a QR code, etc.) since the docker-compose stack
-already listens on `0.0.0.0:9080`, reachable at whatever the current IP is.
-The Cloudflare Tunnel (admin access, `pickerwheel.mytmobiles.com`) is
-entirely unaffected by this and needs no changes when the network changes.
+The page itself loads at whatever the current IP is, because the stack
+listens on `0.0.0.0:9080`. However, the wheel's live-update (Socket.IO)
+connection is rejected with "Not an accepted origin" unless
+`http://<that IP>:9080` is in `ALLOWED_ORIGINS` in `docker-compose.yml`. Add it
+and run `docker compose up -d pickerwheel` whenever the IP changes. The
+`cloudflare-tunnel-doctor` agent checks and fixes this automatically. The
+tunnel's own config needs no changes when the network changes.
 
 ## Troubleshooting
 
