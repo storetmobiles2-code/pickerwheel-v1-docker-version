@@ -79,18 +79,31 @@ Run the checks for each layer, fix any failure, re-check, then move to the next 
 - `docker ps` shows `pickerwheel-app` Up and `pickerwheel-db` healthy. If Docker itself
   errors, Docker Desktop isn't running: start it
   (`Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`) and wait for
-  `docker info` to succeed. Also check that Docker Desktop is set to start on login.
-  Otherwise the app stays down after a reboot until someone opens it. Look for
-  `AutoStart` in `%APPDATA%\Docker\settings-store.json` (or `settings.json` on older
-  versions) and report its value rather than assuming.
+  `docker info` to succeed.
+- Check that Docker Desktop is set to start on login, otherwise the app stays down after
+  a reboot until someone opens it. One signal is not enough here — `AutoStart` in
+  `%APPDATA%\Docker\settings-store.json` (or `settings.json` on older versions) can say
+  `false` while an HKCU `Run` entry still launches it, and Docker Desktop may rewrite that
+  file while it's running. Check both:
+  `Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name "Docker Desktop" -ErrorAction SilentlyContinue`
+  and the JSON's `AutoStart` value, and if they disagree, say so rather than picking one.
+  Comparing the Docker Desktop process start time to the last logon time (`Get-CimInstance
+  Win32_OperatingSystem | select LastBootUpTime`, or `quser` for last logon) can help judge
+  whether it actually launched at login, but isn't proof either way if the machine hasn't
+  rebooted recently. The reliable fix is just telling the user to check Settings > General >
+  "Start Docker Desktop when you sign in" — no elevation needed, and it settles the ambiguity
+  directly.
 - If containers are missing or stopped, run `docker compose up -d` from the repo.
 - `docker top pickerwheel-app` must show `gunicorn --worker-class gthread --workers 1 --threads 16`.
   If it shows `python main.py`, the container is stale: run `docker compose up -d --build`.
 - `curl.exe -s -o NUL -w "%{http_code}" http://localhost:9080/app` and `/admin` must both return 200.
 
 ### Layer 2: LAN access for customers
-- Current IP (exclude Docker/WSL `vEthernet` adapters, which the skill's one-liner does not):
-  `(Get-NetIPAddress -AddressFamily IPv4 | ? { $_.InterfaceAlias -notmatch 'Loopback|vEthernet' -and $_.IPAddress -notmatch '^169\.254' } | Select -First 1).IPAddress`
+- Current IP — prefer the adapter with a default gateway, which `Select -First 1` on a
+  plain address list doesn't guarantee (order isn't fixed, and it can still catch a
+  disconnected or virtual adapter):
+  `(Get-NetIPConfiguration | ? { $_.IPv4DefaultGateway }).IPv4Address.IPAddress`
+  Take the first result if there's more than one (e.g. WiFi + Ethernet both up), and say so.
 - `http://<ip>:9080/app` should return 200.
 - Origin check:
   `curl.exe -s -H "Origin: http://<ip>:9080" "http://<ip>:9080/socket.io/?EIO=4&transport=polling"`
@@ -119,7 +132,14 @@ Run the checks for each layer, fix any failure, re-check, then move to the next 
   inbound ports or router configuration.
 - `Test-NetConnection region1.v2.argotunnel.com -Port 7844` checks TCP.
 - UDP can't be tested directly. Read the most recent `CONNECTIVITY PRE-CHECKS` block in the
-  service log. It reports DNS / UDP / TCP / API as PASS or FAIL after each service start.
+  service log — it reports DNS / UDP / TCP / API as PASS or FAIL once, right after each
+  service start, so a block from hours ago can be stale; a fresh restart produces a fresh one.
+  `Select-String` is case-insensitive by default, so filtering for `FAIL` also matches
+  unrelated runtime lines like "**Fail**ed to accept" and pushes the actual pre-check block
+  out of a head-limited result — pull the whole block by anchoring on its header instead:
+  `Select-String $log 'CONNECTIVITY PRE-CHECKS' -Context 0,12 | Select -Last 1`.
+  A `Registered tunnel connection` line with `"protocol":"quic"` at the current session's
+  timestamp is equally good evidence that UDP works, without needing the pre-check block at all.
 - UDP blocked but TCP OK: set `protocol: http2` in the service config (run the repair
   script with `-Protocol http2`).
 - Both blocked: this can't be fixed from the laptop. Tell the user the network's
@@ -131,15 +151,36 @@ Run the checks for each layer, fix any failure, re-check, then move to the next 
   must contain `--config` and `tunnel run`. If not, run the repair script (lesson 2).
 - `curl.exe -s http://127.0.0.1:20241/ready` should show `readyConnections` > 0.
 - `cloudflared tunnel info pickerwheel-admin` should list a connector.
-- If readyConnections is 0: read the last ~50 log lines. If they show recent
-  `Retrying connection` entries, wait 60–90s and re-check before restarting (lesson 3). If there is
-  no activity for more than 2 minutes, or the service is stuck in StopPending, run the repair script
-  (it force-kills and restarts).
-- `sc.exe qfailure cloudflared` should show a RESTART action, so it self-restarts if it crashes.
+- The systemprofile `config.yml` (e.g. to check it has the right tunnel ID) is only
+  readable elevated — a plain `Get-Content` gives Access Denied for a non-admin session.
+  Don't treat that as a failure; confirm the tunnel ID instead from evidence you can already
+  read without elevation: the service log's startup `"message":"Settings: map[...]"` line,
+  `/ready`'s `connectorId`, or `cloudflared tunnel info` itself.
+- If readyConnections is 0: read the last ~50 log lines, comparing timestamps in UTC (the
+  log's `time` field is UTC; don't compare it against `Get-Date`, which is local, or against
+  file `LastWriteTime`, which is also local — mixing them makes a live tunnel look stale by
+  the local UTC offset). If they show recent `Retrying connection` entries, wait 60–90s and
+  re-check before restarting (lesson 3). If there is no activity for more than 2 minutes, or
+  the service is stuck in StopPending, run the repair script (it force-kills and restarts).
+- `sc.exe qfailure cloudflared` normally shows one RESTART action — that's `service install`'s
+  default, not a problem; the repair script's three-action config takes over once it has run.
+  Windows repeats a service's last configured action after the list is exhausted, so one action
+  still means it restarts on every crash, not just once. Check `$LASTEXITCODE` after `sc.exe`
+  calls rather than piping to `Out-Null` and assuming success — `sc.exe` doesn't raise a
+  PowerShell error or trip `$ErrorActionPreference` on failure.
 
 ### Layer 6: Tunnel → app
 - Look in the log for `Unable to reach the origin service` or `connection refused` against
   `localhost:9080`. That means Layer 1 is broken, even if the tunnel itself is healthy.
+  A handful of these right at container startup/restart is normal (the app wasn't listening
+  yet); only treat it as a live problem if it's still happening at the current timestamp.
+- `curl.exe -s http://127.0.0.1:20241/metrics` has `response_by_code` and `request_errors`
+  counters — cheaper evidence that the tunnel is actually forwarding successful requests than
+  scanning the log by eye, and doesn't need a browser.
+- Note: the ingress rule points at `localhost:9080`, which cloudflared resolves to `[::1]:9080`
+  on this machine. That only works because Docker Desktop also publishes the port on `[::]:9080`
+  (IPv6) — if a future Docker/WSL change stops doing that, this layer breaks with no other
+  symptom. `http://127.0.0.1:9080` in the ingress config would avoid depending on that.
 
 ### Layer 7: End to end
 - `curl.exe -s -o NUL -w "%{http_code}" https://pickerwheel.mytmobiles.com/` should return 302 (to
