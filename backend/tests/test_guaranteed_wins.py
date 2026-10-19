@@ -297,3 +297,55 @@ def test_create_guaranteed_win_requires_prize_id(client, admin_headers):
     resp = client.post('/api/admin/guaranteed-wins', json={'reason': 'no prize'}, headers=admin_headers)
     assert resp.status_code == 400
     assert resp.get_json()['success'] is False
+
+
+def _browser_spin(client, user_id):
+    """Replays exactly what frontend/wheel.js does: /pre-spin, then /spin
+    echoing only what the pre-spin response provided."""
+    pre = client.post('/api/pre-spin', json={'user_id': user_id}).get_json()
+    body = {'user_id': user_id, 'selected_prize_id': pre['selected_prize']['id']}
+    if pre.get('is_guaranteed'):
+        body['guaranteed_win_id'] = pre['guaranteed_win_id']
+    return pre, client.post('/api/spin', json=body)
+
+
+def test_single_quantity_guaranteed_win_is_not_repeated(client, admin_headers, make_prize):
+    """Regression: the wheel never sent guaranteed_win_id to /spin, so the
+    win stayed pending and re-fired until the prize's stock ran out."""
+    gw_prize = make_prize(quantity=5, daily_limit=5, name='gw prize')
+    make_prize(quantity=50, daily_limit=50, name='filler prize')
+    win_id = _create_guaranteed_win(
+        client, admin_headers, gw_prize['id'], max_triggers=1
+    ).get_json()['win']['id']
+
+    pre, spin = _browser_spin(client, 'kiosk')
+    assert pre['guaranteed_win_id'] == win_id
+    assert spin.status_code == 200
+
+    row = execute_sql(
+        'SELECT status, triggered_count FROM guaranteed_wins WHERE id = :id', {'id': win_id}
+    )[0]
+    assert row['status'] == 'triggered' and row['triggered_count'] == 1
+
+    pre2 = client.post('/api/pre-spin', json={'user_id': 'kiosk'}).get_json()
+    assert not pre2.get('is_guaranteed')
+
+
+def test_multi_quantity_guaranteed_win_stops_at_max_triggers(client, admin_headers, make_prize):
+    gw_prize = make_prize(quantity=10, daily_limit=10, name='gw prize')
+    make_prize(quantity=50, daily_limit=50, name='filler prize')
+    win_id = _create_guaranteed_win(
+        client, admin_headers, gw_prize['id'], max_triggers=2
+    ).get_json()['win']['id']
+
+    for _ in range(2):
+        pre, spin = _browser_spin(client, 'kiosk')
+        assert pre['guaranteed_win_id'] == win_id
+        assert spin.status_code == 200
+
+    pre3 = client.post('/api/pre-spin', json={'user_id': 'kiosk'}).get_json()
+    assert not pre3.get('is_guaranteed')
+    row = execute_sql(
+        'SELECT status, triggered_count FROM guaranteed_wins WHERE id = :id', {'id': win_id}
+    )[0]
+    assert row['status'] == 'triggered' and row['triggered_count'] == 2

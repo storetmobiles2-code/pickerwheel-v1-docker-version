@@ -1851,7 +1851,10 @@ class PickerWheelUI {
         return {
             prize: prize,
             targetSegment: targetSegment,
-            totalSegments: data.total_segments
+            totalSegments: data.total_segments,
+            // Present only when this spin fulfils a scheduled/guaranteed
+            // win; must be echoed to /spin so the server counts the trigger
+            guaranteedWinId: data.is_guaranteed ? data.guaranteed_win_id : undefined
         };
     }
 
@@ -1933,6 +1936,7 @@ class PickerWheelUI {
             body: JSON.stringify({
                 user_id: this.getUserId(),
                 selected_prize_id: availablePrize.prize.id,
+                guaranteed_win_id: availablePrize.guaranteedWinId,
                 target_segment_index: rotationData.targetSegment,
                 final_rotation: rotationData.totalRotation
             })
