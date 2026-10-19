@@ -123,7 +123,13 @@ def wheel_of_prizes(make_prize):
 
 
 @pytest.fixture()
-def admin_headers():
+def admin_headers(client):
+    """Logs the test client in (admin routes authenticate via the session
+    cookie set by POST /api/admin/login since #26, not a per-request
+    password) and returns the header dict for tests that still pass it.
+    Tests that don't request this fixture stay unauthenticated."""
+    resp = client.post('/api/admin/login', json={'admin_password': ADMIN_PASSWORD})
+    assert resp.status_code == 200, 'admin login failed in test setup'
     return {'X-Admin-Password': ADMIN_PASSWORD}
 
 
