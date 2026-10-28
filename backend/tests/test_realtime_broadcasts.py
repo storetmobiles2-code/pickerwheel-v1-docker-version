@@ -15,8 +15,9 @@ Happy path:
 from app import socketio as flask_socketio
 
 
-def test_prize_mutation_broadcasts_to_connected_client(app, admin_headers):
-    client = app.test_client()
+def test_prize_mutation_broadcasts_to_connected_client(app, client, admin_headers):
+    # `client` is the one admin_headers logged in - admin routes check its
+    # session cookie (#26), so a fresh app.test_client() would get a 401.
     sio = flask_socketio.test_client(app, flask_test_client=client)
     sio.get_received()  # drain the initial 'connected' event
 
@@ -39,11 +40,10 @@ def test_prize_mutation_broadcasts_to_connected_client(app, admin_headers):
     assert 'T' in events['prize:added']['prize']['updated_at']
 
 
-def test_inventory_change_broadcasts_to_connected_client(app, admin_headers, make_prize):
+def test_inventory_change_broadcasts_to_connected_client(app, client, admin_headers, make_prize):
     from app.models import Inventory
     prize = make_prize(quantity=10, daily_limit=5)
     current = Inventory.get_for_prize(prize['id'])
-    client = app.test_client()
     sio = flask_socketio.test_client(app, flask_test_client=client)
     sio.get_received()
 

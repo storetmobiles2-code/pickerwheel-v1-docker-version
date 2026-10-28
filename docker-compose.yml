@@ -77,7 +77,7 @@ services:
       # Tunnel gets rejected with "not an accepted origin" (surfaced to the
       # client as a 400/502), even though a manual curl test without an
       # Origin header would look fine.
-      - ALLOWED_ORIGINS=http://localhost:9080,http://127.0.0.1:9080,http://192.168.1.22:9080,https://pickerwheel.mytmobiles.com
+      - ALLOWED_ORIGINS=http://localhost:9080,http://127.0.0.1:9080,http://192.168.1.22:9080,http://192.168.1.23:9080,https://pickerwheel.mytmobiles.com
     depends_on:
       postgres:
         condition: service_healthy
