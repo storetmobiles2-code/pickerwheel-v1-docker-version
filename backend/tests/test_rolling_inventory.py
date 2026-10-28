@@ -130,3 +130,92 @@ def test_wheel_display_and_spin_work_end_to_end_on_a_rolled_day(client, make_pri
     assert spin.status_code == 200
     won = _today_row(pre['selected_prize']['id'])
     assert won['remaining_quantity'] == 2  # 3 fresh, one consumed
+
+
+# ---------------------------------------------------------------------------
+# Long-horizon simulation: the wheel keeps working for over a year with no
+# manual refresh, including prizes added by an admin part-way through (the
+# admin "add prize" route only pre-seeds 30 days of rows for a new prize, a
+# second hidden end date this has to cover).
+# ---------------------------------------------------------------------------
+import pytest
+from app.models import Prize
+from app.models import inventory as inventory_module
+
+_RealDate = date
+
+
+@pytest.fixture()
+def fake_today(monkeypatch):
+    """Lets a test move 'today' for Inventory.ensure_for_date, which reads
+    date.today() from the inventory module."""
+    class _FakeDate(_RealDate):
+        current = _RealDate.today()
+
+        @classmethod
+        def today(cls):
+            return cls.current
+
+    monkeypatch.setattr(inventory_module, 'date', _FakeDate)
+    return _FakeDate
+
+
+def _names_available(app, day):
+    with app.app_context():
+        return {p['name'] for p in Prize.get_available_for_spin(1, day)}
+
+
+def test_wheel_keeps_working_for_over_a_year_including_new_prizes(app, make_prize, fake_today):
+    start = _RealDate.today()
+    fake_today.current = start
+
+    # Seeded the way the admin add-prize route does it: a fixed window only
+    for name, qty, limit in (('always-A', 10, 2), ('always-B', 5, 1)):
+        p = make_prize(quantity=qty, daily_limit=limit, name=name)
+        with app.app_context():
+            Inventory.create_for_prize_range(p['id'], start_date=start, days=30,
+                                             initial_quantity=qty, daily_limit=limit)
+    # A "only on specific dates" prize, stored as 0 stock on every other day
+    make_prize(quantity=0, daily_limit=1, name='date-limited')
+
+    added_c = False
+    for offset in range(0, 420):
+        day = start + timedelta(days=offset)
+        fake_today.current = day
+
+        if offset == 100 and not added_c:
+            # admin adds a prize on day 100 - gets only 30 days pre-seeded
+            c = make_prize(quantity=7, daily_limit=3, name='added-C', target_date=day)
+            with app.app_context():
+                Inventory.create_for_prize_range(c['id'], start_date=day, days=30,
+                                                 initial_quantity=7, daily_limit=3)
+            added_c = True
+
+        got = _names_available(app, day)
+        assert {'always-A', 'always-B'} <= got, f'day +{offset} ({day}): wheel lost its prizes: {got}'
+        assert 'date-limited' not in got
+        if offset >= 100:
+            assert 'added-C' in got, f'day +{offset} ({day}): added prize vanished: {got}'
+
+    # Config carried all the way through, with full fresh stock each day
+    last = execute_sql(
+        "SELECT p.name, pi.initial_quantity iq, pi.remaining_quantity rem, pi.daily_limit lim "
+        "FROM prize_inventory pi JOIN prizes p ON p.id = pi.prize_id "
+        "WHERE pi.available_date = :d AND p.name IN ('always-A','added-C') ORDER BY p.name",
+        {'d': start + timedelta(days=419)}
+    )
+    assert [(r['name'], r['iq'], r['rem'], r['lim']) for r in last] == [
+        ('added-C', 7, 7, 3), ('always-A', 10, 10, 2)]
+
+
+def test_wheel_recovers_after_the_laptop_was_off_for_months(app, make_prize, fake_today):
+    start = _RealDate.today()
+    fake_today.current = start
+    p = make_prize(quantity=4, daily_limit=2, name='gap-prize')
+    with app.app_context():
+        Inventory.create_for_prize_range(p['id'], start_date=start, days=30,
+                                         initial_quantity=4, daily_limit=2)
+
+    back = start + timedelta(days=200)  # nothing touched the app in between
+    fake_today.current = back
+    assert 'gap-prize' in _names_available(app, back)
