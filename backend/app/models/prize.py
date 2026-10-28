@@ -6,6 +6,7 @@ Handles prize CRUD operations with is_enabled support
 import logging
 from datetime import date
 from ..database import execute_sql, session_scope, execute_function
+from .inventory import Inventory
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ class Prize:
         """Get all active prizes for wheel display (including disabled)"""
         if target_date is None:
             target_date = date.today()
+        Inventory.ensure_for_date(event_id, target_date)
         
         results = execute_function('get_wheel_display_prizes', event_id, target_date)
         return results or []
@@ -96,6 +98,7 @@ class Prize:
         """Get prizes that can be won (enabled + has inventory)"""
         if target_date is None:
             target_date = date.today()
+        Inventory.ensure_for_date(event_id, target_date)
         
         results = execute_function('get_available_prizes', event_id, target_date)
         return results or []

@@ -13,13 +13,76 @@ logger = logging.getLogger(__name__)
 
 class Inventory:
     """Prize inventory model"""
-    
+
+    @staticmethod
+    def ensure_for_date(event_id=1, target_date=None):
+        """
+        Make sure every active prize has an inventory row for today,
+        creating any that are missing. Returns how many were created.
+
+        Inventory is stored one row per prize per day, and everything the
+        customer wheel reads filters on available_date = today. The initial
+        data load only seeds a fixed window of days, so once that window
+        ran out there were no rows for today and /pre-spin answered "No
+        prizes available" - the app silently had an end date. This makes
+        the schedule rolling instead: a missing day is created by carrying
+        each prize's configuration (initial_quantity, daily_limit) forward
+        from its most recent earlier row, with a fresh remaining_quantity.
+
+        Safe to call on every request: it never touches rows that already
+        exist (ON CONFLICT DO NOTHING, so concurrent callers can't
+        duplicate), and a prize with no earlier row at all is left alone
+        (it was never given inventory, same as before). Only ever fills
+        in today, never future or past dates.
+        """
+        today = date.today()
+        if target_date is None:
+            target_date = today
+        if target_date != today:
+            return 0
+
+        try:
+            results = execute_sql("""
+            INSERT INTO prize_inventory
+                (prize_id, event_id, available_date,
+                 initial_quantity, remaining_quantity, daily_limit)
+            SELECT p.id, :event_id, :date,
+                   src.initial_quantity, src.initial_quantity, src.daily_limit
+            FROM prizes p
+            JOIN LATERAL (
+                SELECT pi.initial_quantity, pi.daily_limit
+                FROM prize_inventory pi
+                WHERE pi.prize_id = p.id
+                  AND pi.event_id = :event_id
+                  AND pi.available_date < :date
+                ORDER BY pi.available_date DESC
+                LIMIT 1
+            ) src ON TRUE
+            WHERE p.is_active = TRUE
+            ON CONFLICT (prize_id, event_id, available_date) DO NOTHING
+            RETURNING prize_id
+            """, {'event_id': event_id, 'date': target_date})
+        except Exception:
+            # Housekeeping must never take the wheel down: if it fails the
+            # caller just sees whatever inventory exists, as it did before.
+            logger.exception("Failed to roll inventory forward to %s", target_date)
+            return 0
+
+        created = len(results) if results else 0
+        if created:
+            logger.warning(
+                f"Rolled inventory forward to {target_date}: created {created} "
+                f"missing prize_inventory rows"
+            )
+        return created
+
     @staticmethod
     def get_for_prize(prize_id, event_id=1, target_date=None):
         """Get inventory for a specific prize"""
         if target_date is None:
             target_date = date.today()
-        
+        Inventory.ensure_for_date(event_id, target_date)
+
         sql = """
             SELECT pi.id, pi.prize_id, pi.event_id, pi.available_date,
                    pi.initial_quantity, pi.remaining_quantity, pi.daily_limit,
@@ -44,6 +107,7 @@ class Inventory:
         """Get all inventory for a specific date"""
         if target_date is None:
             target_date = date.today()
+        Inventory.ensure_for_date(event_id, target_date)
         
         sql = """
             SELECT pi.id, pi.prize_id, pi.event_id, pi.available_date,
