@@ -10,8 +10,13 @@ description: Set up Docker + cloudflared on the Windows store laptop, run the Pi
 PickerWheel currently runs via `docker-compose.yml` on a developer's Mac for
 testing, tunneled to the public internet at `pickerwheel.mytmobiles.com`
 through a named Cloudflare Tunnel (`pickerwheel-admin`, tunnel id
-`cb7a20ad-a009-4875-8850-79000bd32542`). The end target is a Windows laptop
+`df80fe61-1b18-4778-94d8-6dddc8ece52a`). The end target is a Windows laptop
 at the actual store, permanently.
+
+That tunnel was created fresh on the store laptop on 2026-09-27 (Option B
+below), replacing the original `cb7a20ad-...` tunnel used while testing on
+the Mac. If the ID ever looks wrong, `cloudflared tunnel list` shows the
+current one on the `pickerwheel-admin` row.
 
 **Cloudflare-side setup (DNS, the Access Application, the 5-email allow
 policy, One-Time-PIN identity provider, login branding) is already done in
@@ -99,12 +104,12 @@ working with zero Cloudflare-side changes):**
    to the Windows machine's `%USERPROFILE%\.cloudflared\` folder (AirDrop,
    an encrypted USB stick, or a password manager's secure file storage -
    not email, not Slack, not committed anywhere):
-   - `cb7a20ad-a009-4875-8850-79000bd32542.json` (the tunnel credentials)
+   - `df80fe61-1b18-4778-94d8-6dddc8ece52a.json` (the tunnel credentials)
    - `cert.pem` (the account-level origin certificate)
 2. Create `%USERPROFILE%\.cloudflared\config.yml`:
    ```yaml
-   tunnel: cb7a20ad-a009-4875-8850-79000bd32542
-   credentials-file: C:\Users\<you>\.cloudflared\cb7a20ad-a009-4875-8850-79000bd32542.json
+   tunnel: df80fe61-1b18-4778-94d8-6dddc8ece52a
+   credentials-file: C:\Users\<you>\.cloudflared\df80fe61-1b18-4778-94d8-6dddc8ece52a.json
 
    ingress:
      - hostname: pickerwheel.mytmobiles.com
@@ -184,11 +189,17 @@ Run this any time the laptop joins a different WiFi network, to get the
 current URL for customers on that same local network:
 
 ```powershell
-$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-    $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notmatch '^169\.254'
-} | Select-Object -First 1).IPAddress
-Write-Host "Customer wheel (this network): http://$($ip):9080"
+$ip = @(Get-NetIPConfiguration |
+    Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+    ForEach-Object { $_.IPv4Address.IPAddress })[0]
+Write-Host "Customer wheel (this network): http://$($ip):9080/app"
 ```
+
+Pick the adapter that has a default gateway, not just the first IPv4 address.
+Docker Desktop's WSL adapter (`vEthernet (WSL ...)`, e.g. `192.168.128.1`)
+often comes first in the address list, and phones on the WiFi can't reach it.
+If WiFi and Ethernet are both connected, this takes the first one, so check
+it's the one customers' phones are on.
 
 The page itself loads at whatever the current IP is, because the stack
 listens on `0.0.0.0:9080`. However, the wheel's live-update (Socket.IO)
