@@ -22,7 +22,8 @@ class SpinService:
         """Get prizes available for winning (enabled + has inventory)"""
         if target_date is None:
             target_date = date.today()
-        
+
+        Inventory.ensure_for_date(event_id, target_date)
         return Prize.get_available_for_spin(event_id, target_date)
     
     @staticmethod
@@ -30,7 +31,8 @@ class SpinService:
         """Get all prizes for wheel display (including disabled)"""
         if target_date is None:
             target_date = date.today()
-        
+
+        Inventory.ensure_for_date(event_id, target_date)
         return Prize.get_for_wheel_display(event_id, target_date)
     
     @staticmethod
@@ -45,7 +47,11 @@ class SpinService:
         """
         if target_date is None:
             target_date = date.today()
-        
+
+        # Before the guaranteed-win branch, which returns early and needs
+        # today's row to exist for consume_prize() to award it
+        Inventory.ensure_for_date(event_id, target_date)
+
         # Priority 1: Check for guaranteed win
         guaranteed_win = GuaranteedWin.get_pending(user_identifier, event_id)
         if guaranteed_win:

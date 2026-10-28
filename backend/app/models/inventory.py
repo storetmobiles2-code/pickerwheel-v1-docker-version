@@ -10,6 +10,11 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
+# How far ahead Inventory.ensure_for_date() will create a day's rows -
+# the same 30-day window the seed script and new-prize setup stock up
+# front. Bounded because the public API accepts an arbitrary ?date=.
+AUTO_CREATE_DAYS_AHEAD = 30
+
 
 class Inventory:
     """Prize inventory model"""
@@ -112,7 +117,66 @@ class Inventory:
         
         logger.info(f"Created {len(results)} inventory entries for prize {prize_id}")
         return results
-    
+
+    @staticmethod
+    def ensure_for_date(event_id=1, target_date=None):
+        """
+        Create a day's inventory rows for every active prize that doesn't
+        have one yet, carrying initial_quantity and daily_limit over from
+        that prize's most recent earlier day (remaining starts full).
+
+        Inventory used to exist only for the 31 days the seed script
+        created up front, so the wheel returned "No prizes available" on
+        the first day after that ran out. Prizes with no earlier
+        inventory are skipped rather than stocked with made-up
+        quantities, past days are never backfilled, and days beyond
+        AUTO_CREATE_DAYS_AHEAD are ignored.
+
+        Returns the number of rows created.
+        """
+        if target_date is None:
+            target_date = date.today()
+
+        today = date.today()
+        if not today <= target_date <= today + timedelta(days=AUTO_CREATE_DAYS_AHEAD):
+            return 0
+
+        # NOT EXISTS keeps the common case (day already stocked) from
+        # drawing ids off prize_inventory_id_seq on every wheel request;
+        # ON CONFLICT still covers two requests racing to create the day.
+        sql = """
+            INSERT INTO prize_inventory (prize_id, event_id, available_date,
+                                         initial_quantity, remaining_quantity, daily_limit)
+            SELECT p.id, :event_id, :date,
+                   prev.initial_quantity, prev.initial_quantity, prev.daily_limit
+            FROM prizes p
+            JOIN LATERAL (
+                SELECT pi.initial_quantity, pi.daily_limit
+                FROM prize_inventory pi
+                WHERE pi.prize_id = p.id
+                  AND pi.event_id = :event_id
+                  AND pi.available_date < :date
+                ORDER BY pi.available_date DESC
+                LIMIT 1
+            ) prev ON TRUE
+            WHERE p.is_active = TRUE
+              AND NOT EXISTS (
+                  SELECT 1 FROM prize_inventory cur
+                  WHERE cur.prize_id = p.id
+                    AND cur.event_id = :event_id
+                    AND cur.available_date = :date
+              )
+            ON CONFLICT (prize_id, event_id, available_date) DO NOTHING
+            RETURNING prize_id
+        """
+        created = execute_sql(sql, {'event_id': event_id, 'date': target_date}) or []
+        if created:
+            logger.info(
+                f"Created inventory for {len(created)} prizes on {target_date}, "
+                f"carried over from each prize's previous day"
+            )
+        return len(created)
+
     @staticmethod
     def update_quantity(prize_id, event_id=1, target_date=None,
                         remaining_quantity=None, daily_limit=None,

@@ -13,8 +13,9 @@ test.describe('Customer wheel page - happy path', () => {
   test('loads with the wheel rendered and centered, in Neon by default', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#wheel')).toBeVisible();
-    const segmentCount = await page.locator('.wheel-inner path').count();
-    expect(segmentCount).toBeGreaterThan(0);
+    // Segments are drawn after the async prize fetch, so poll rather than
+    // count once - a single count() raced the render and saw 0
+    await expect.poll(() => page.locator('.wheel-inner path').count()).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.documentElement.dataset.designMode)).toBe('neon');
   });
 
