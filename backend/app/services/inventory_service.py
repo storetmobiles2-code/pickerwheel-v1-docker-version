@@ -18,9 +18,11 @@ class InventoryService:
         """Get complete inventory status for a date"""
         if target_date is None:
             target_date = date.today()
-        
+
+        # So the admin panel can view and adjust a day before anyone spins
+        Inventory.ensure_for_date(event_id, target_date)
         inventory = Inventory.get_all_for_date(event_id, target_date)
-        
+
         # Calculate summary
         total_prizes = len(inventory)
         available = sum(1 for i in inventory if i['remaining_quantity'] > 0 and i['is_enabled'])
