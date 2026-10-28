@@ -13,6 +13,8 @@ Failure path:
 """
 import pytest
 
+from app import socketio as flask_socketio
+
 
 # A representative sample of admin routes spanning different resource
 # types and HTTP methods - not exhaustive, but enough to catch a
@@ -68,10 +70,13 @@ def test_websocket_admin_join_rejects_wrong_password(socketio_client):
     assert 'admin:joined' not in events
 
 
-def test_websocket_admin_join_accepts_correct_password(socketio_client):
-    socketio_client.emit('admin:join', {'admin_password': 'myTAdmin2025'})
-    received = socketio_client.get_received()
-    events = [msg['name'] for msg in received]
+def test_websocket_admin_join_accepts_logged_in_session(app, client, admin_headers):
+    # Since #26 the socket checks the session cookie set by POST
+    # /api/admin/login (copied in at connect time), not a password sent with
+    # the event - so connect from the same client admin_headers logged in.
+    sio = flask_socketio.test_client(app, flask_test_client=client)
+    sio.emit('admin:join', {})
+    events = [msg['name'] for msg in sio.get_received()]
     assert 'admin:joined' in events
 
 
